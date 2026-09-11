@@ -5,9 +5,11 @@ import json
 from pathlib import Path, PureWindowsPath
 from urllib.parse import quote
 
-from repoatlas.parser import build_signature
-from repoatlas.renderer import DEFAULT_DESCRIPTION, render_structure_markdown
-from repoatlas.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
+from repoatlas.core.parser import build_signature
+from repoatlas.core.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
+from repoatlas.rendering.renderer import DEFAULT_DESCRIPTION, render_structure_markdown
+from repoatlas.semantic.index import build_summary_index, make_summary_key
+from repoatlas.semantic.models import SemanticSummary
 
 
 TEMPLATE_PATH = Path(__file__).parent / "templates" / "map.html"
@@ -49,11 +51,35 @@ def _read_source(root_path: str | Path, relative_path: str) -> str:
         return ""
 
 
+def _lookup_summary(
+    summary_index: dict[tuple[object, ...], SemanticSummary],
+    *,
+    target_type: str,
+    file_path: str,
+    name: str,
+    start_line: int | None,
+    class_name: str | None,
+    language: str,
+) -> str | None:
+    """按 semantic.index 的统一键规则查找已提供的摘要。"""
+    key = make_summary_key(
+        target_type=target_type,
+        file_path=file_path,
+        name=name,
+        start_line=start_line,
+        class_name=class_name,
+        language=language,
+    )
+    summary = summary_index.get(key)
+    return summary.summary if summary is not None else None
+
+
 def _serialize_function(
     function_info: FunctionInfo,
     file_path: str,
     symbol_type: str,
-    root_path: str | Path,
+    summary_index: dict[tuple[object, ...], SemanticSummary],
+    language: str,
 ) -> dict[str, object]:
     """把函数或方法转换为适合前端消费的字典。"""
     is_method = symbol_type == "method"
@@ -67,10 +93,14 @@ def _serialize_function(
         "parameters": function_info.parameters,
         "class_name": function_info.class_name,
         "docstring": _description(function_info.docstring),
-        "vscode_uri": build_vscode_uri(
-            root_path,
-            file_path,
-            function_info.start_line,
+        "semantic_summary": _lookup_summary(
+            summary_index,
+            target_type=symbol_type,
+            file_path=file_path,
+            name=function_info.name,
+            start_line=function_info.start_line,
+            class_name=function_info.class_name if is_method else None,
+            language=language,
         ),
     }
 
@@ -78,7 +108,8 @@ def _serialize_function(
 def _serialize_class(
     class_info: ClassInfo,
     file_path: str,
-    root_path: str | Path,
+    summary_index: dict[tuple[object, ...], SemanticSummary],
+    language: str,
 ) -> dict[str, object]:
     """把类信息转换为 JSON 可序列化结构。"""
     return {
@@ -88,10 +119,14 @@ def _serialize_class(
         "start_line": class_info.start_line,
         "end_line": class_info.end_line,
         "docstring": _description(class_info.docstring),
-        "vscode_uri": build_vscode_uri(
-            root_path,
-            file_path,
-            class_info.start_line,
+        "semantic_summary": _lookup_summary(
+            summary_index,
+            target_type="class",
+            file_path=file_path,
+            name=class_info.name,
+            start_line=class_info.start_line,
+            class_name=None,
+            language=language,
         ),
     }
 
@@ -99,6 +134,8 @@ def _serialize_class(
 def _serialize_file(
     file_info: FileInfo,
     root_path: str | Path,
+    summary_index: dict[tuple[object, ...], SemanticSummary],
+    language: str,
 ) -> dict[str, object]:
     """完整序列化文件及其全部 classes、functions 和 methods。"""
     return {
@@ -110,8 +147,22 @@ def _serialize_file(
         "docstring": DEFAULT_DESCRIPTION,
         "source": _read_source(root_path, file_info.path),
         "vscode_uri": build_vscode_uri(root_path, file_info.path),
+        "semantic_summary": _lookup_summary(
+            summary_index,
+            target_type="file",
+            file_path=file_info.path,
+            name=file_info.path,
+            start_line=None,
+            class_name=None,
+            language=language,
+        ),
         "classes": [
-            _serialize_class(class_info, file_info.path, root_path)
+            _serialize_class(
+                class_info,
+                file_info.path,
+                summary_index,
+                language,
+            )
             for class_info in file_info.classes
         ],
         "functions": [
@@ -119,7 +170,8 @@ def _serialize_file(
                 function_info,
                 file_info.path,
                 "function",
-                root_path,
+                summary_index,
+                language,
             )
             for function_info in file_info.functions
         ],
@@ -128,23 +180,34 @@ def _serialize_file(
                 method_info,
                 file_info.path,
                 "method",
-                root_path,
+                summary_index,
+                language,
             )
             for method_info in file_info.methods
         ],
     }
 
 
-def repository_to_dict(repository: RepositoryInfo) -> dict[str, object]:
+def repository_to_dict(
+    repository: RepositoryInfo,
+    summaries: list[SemanticSummary] | None = None,
+    language: str = "en",
+) -> dict[str, object]:
     """构建可同时用于 JSON 导出和页面渲染的数据模型。"""
     root_text = str(repository.root_path).rstrip("/\\")
     repository_name = Path(root_text).name or root_text or "Repository"
+    summary_index = build_summary_index(summaries or [])
     return {
         "type": "repository",
         "name": repository_name,
         "root_path": str(repository.root_path),
         "files": [
-            _serialize_file(file_info, repository.root_path)
+            _serialize_file(
+                file_info,
+                repository.root_path,
+                summary_index,
+                language,
+            )
             for file_info in repository.files
         ],
     }
@@ -153,15 +216,18 @@ def repository_to_dict(repository: RepositoryInfo) -> dict[str, object]:
 def export_repository_json(
     repository: RepositoryInfo,
     output_path: str | Path,
+    summaries: list[SemanticSummary] | None = None,
+    language: str = "en",
 ) -> Path:
     """把仓库结构导出为 UTF-8 编码的 structure.json。"""
-    destination = Path(output_path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
-        json.dumps(repository_to_dict(repository), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
+    return _write_json(
+        repository_to_dict(
+            repository,
+            summaries=summaries,
+            language=language,
+        ),
+        output_path,
     )
-    return destination
 
 
 def _embed_json(data: dict[str, object]) -> str:
@@ -174,16 +240,29 @@ def _embed_json(data: dict[str, object]) -> str:
     )
 
 
+def _write_json(data: dict[str, object], output_path: str | Path) -> Path:
+    """把可视化数据写入指定的 UTF-8 JSON 文件。"""
+    destination = Path(output_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return destination
+
+
 def render_visual_map(
     repository: RepositoryInfo,
     output_dir: str | Path,
+    summaries: list[SemanticSummary] | None = None,
+    language: str = "en",
 ) -> dict[str, Path]:
     """生成 STRUCTURE.md、structure.json 和可直接打开的 map.html。"""
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
 
-    data = repository_to_dict(repository)
-    json_path = export_repository_json(repository, destination / "structure.json")
+    data = repository_to_dict(repository, summaries=summaries, language=language)
+    json_path = _write_json(data, destination / "structure.json")
 
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     html_content = template.replace(

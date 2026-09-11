@@ -1,5 +1,5 @@
-from repoatlas.renderer import render_mindmap, render_structure_markdown
-from repoatlas.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
+from repoatlas.core.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
+from repoatlas.rendering.renderer import render_mindmap, render_structure_markdown
 
 
 def make_repository() -> RepositoryInfo:

@@ -1,12 +1,13 @@
 import json
 
-from repoatlas.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
-from repoatlas.visualizer import (
+from repoatlas.core.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
+from repoatlas.rendering.visualizer import (
     build_vscode_uri,
     export_repository_json,
     render_visual_map,
     repository_to_dict,
 )
+from repoatlas.semantic.models import SemanticSummary
 
 
 def make_repository() -> RepositoryInfo:
@@ -48,6 +49,68 @@ def make_repository() -> RepositoryInfo:
     )
 
 
+def make_summaries() -> list[SemanticSummary]:
+    """创建覆盖文件、类、函数和方法的双语摘要。"""
+    return [
+        SemanticSummary(
+            target_type="file",
+            file_path="repoatlas/robot.py",
+            name="repoatlas/robot.py",
+            summary="Defines the robot model and factory.",
+            language="en",
+        ),
+        SemanticSummary(
+            target_type="file",
+            file_path="repoatlas/robot.py",
+            name="repoatlas/robot.py",
+            summary="定义机器人模型和工厂函数。",
+            language="zh-CN",
+        ),
+        SemanticSummary(
+            target_type="class",
+            file_path="repoatlas/robot.py",
+            name="Robot",
+            start_line=5,
+            summary="Represents a controllable robot.",
+            language="en",
+        ),
+        SemanticSummary(
+            target_type="function",
+            file_path="repoatlas/robot.py",
+            name="create_robot",
+            start_line=33,
+            summary="Builds a robot from configuration.",
+            language="en",
+        ),
+        SemanticSummary(
+            target_type="function",
+            file_path="repoatlas/robot.py",
+            name="create_robot",
+            start_line=33,
+            summary="根据配置创建机器人。",
+            language="zh-CN",
+        ),
+        SemanticSummary(
+            target_type="method",
+            file_path="repoatlas/robot.py",
+            name="move",
+            start_line=10,
+            class_name="Robot",
+            summary="Moves the robot to a requested position.",
+            language="en",
+        ),
+        SemanticSummary(
+            target_type="method",
+            file_path="repoatlas/robot.py",
+            name="move",
+            start_line=10,
+            class_name="OtherRobot",
+            summary="This summary belongs to another class.",
+            language="en",
+        ),
+    ]
+
+
 def test_export_repository_json_contains_complete_structure(tmp_path):
     output_path = tmp_path / "output" / "structure.json"
 
@@ -64,6 +127,10 @@ def test_export_repository_json_contains_complete_structure(tmp_path):
     assert data["files"][0]["functions"][0]["parameters"] == ["config"]
     assert data["files"][0]["methods"][0]["name"] == "move"
     assert data["files"][0]["methods"][0]["signature"] == "move(position, speed)"
+    assert data["files"][0]["semantic_summary"] is None
+    assert data["files"][0]["classes"][0]["semantic_summary"] is None
+    assert data["files"][0]["functions"][0]["semantic_summary"] is None
+    assert data["files"][0]["methods"][0]["semantic_summary"] is None
 
 
 def test_render_visual_map_generates_all_outputs(tmp_path):
@@ -91,13 +158,16 @@ def test_map_html_contains_repository_and_interactive_nodes(tmp_path):
     assert 'id="detail-panel"' in html
     assert "function selectNode" in html
     assert "Expand all" in html
-    assert "Open in VS Code" in html
-    assert 'addEventListener("dblclick"' in html
+    assert "Open File in VS Code" in html
+    assert 'addEventListener("dblclick"' not in html
     assert 'id="code-viewer"' in html
     assert "function renderSource" in html
+    assert 'id="semantic-summary"' in html
+    assert "AI Summary" in html
+    assert "semanticSummary.hidden = !node.semantic_summary" in html
 
 
-def test_vscode_uris_use_absolute_encoded_paths_and_symbol_lines():
+def test_only_file_nodes_expose_vscode_uri():
     repository = make_repository()
     repository.root_path = "D:/projects/RepoAtlas Demo"
 
@@ -107,15 +177,75 @@ def test_vscode_uris_use_absolute_encoded_paths_and_symbol_lines():
     assert file_data["vscode_uri"] == (
         "vscode://file/D:/projects/RepoAtlas%20Demo/repoatlas/robot.py:1"
     )
-    assert file_data["classes"][0]["vscode_uri"] == (
-        "vscode://file/D:/projects/RepoAtlas%20Demo/repoatlas/robot.py:5"
+    assert "vscode_uri" not in file_data["classes"][0]
+    assert "vscode_uri" not in file_data["functions"][0]
+    assert "vscode_uri" not in file_data["methods"][0]
+
+
+def test_semantic_summaries_match_file_class_function_and_method():
+    data = repository_to_dict(make_repository(), summaries=make_summaries())
+    file_data = data["files"][0]
+
+    assert file_data["semantic_summary"] == "Defines the robot model and factory."
+    assert file_data["classes"][0]["semantic_summary"] == (
+        "Represents a controllable robot."
     )
-    assert file_data["functions"][0]["vscode_uri"] == (
-        "vscode://file/D:/projects/RepoAtlas%20Demo/repoatlas/robot.py:33"
+    assert file_data["functions"][0]["semantic_summary"] == (
+        "Builds a robot from configuration."
     )
-    assert file_data["methods"][0]["vscode_uri"] == (
-        "vscode://file/D:/projects/RepoAtlas%20Demo/repoatlas/robot.py:10"
+    assert file_data["methods"][0]["semantic_summary"] == (
+        "Moves the robot to a requested position."
     )
+
+
+def test_method_summary_matching_includes_class_name():
+    summaries = [
+        summary
+        for summary in make_summaries()
+        if summary.target_type == "method" and summary.class_name == "OtherRobot"
+    ]
+
+    method_data = repository_to_dict(
+        make_repository(),
+        summaries=summaries,
+    )["files"][0]["methods"][0]
+
+    assert method_data["semantic_summary"] is None
+
+
+def test_semantic_summary_language_selection():
+    repository = make_repository()
+    summaries = make_summaries()
+
+    english = repository_to_dict(repository, summaries=summaries, language="en")
+    chinese = repository_to_dict(repository, summaries=summaries, language="zh-CN")
+
+    assert english["files"][0]["semantic_summary"] == (
+        "Defines the robot model and factory."
+    )
+    assert chinese["files"][0]["semantic_summary"] == "定义机器人模型和工厂函数。"
+    assert english["files"][0]["functions"][0]["semantic_summary"] == (
+        "Builds a robot from configuration."
+    )
+    assert chinese["files"][0]["functions"][0]["semantic_summary"] == (
+        "根据配置创建机器人。"
+    )
+
+
+def test_render_visual_map_embeds_selected_language_summary(tmp_path):
+    paths = render_visual_map(
+        make_repository(),
+        tmp_path / "output",
+        summaries=make_summaries(),
+        language="zh-CN",
+    )
+
+    data = json.loads(paths["json"].read_text(encoding="utf-8"))
+    html = paths["html"].read_text(encoding="utf-8")
+
+    assert data["files"][0]["semantic_summary"] == "定义机器人模型和工厂函数。"
+    assert "定义机器人模型和工厂函数。" in html
+    assert "根据配置创建机器人。" in html
 
 
 def test_vscode_uri_encodes_special_characters():

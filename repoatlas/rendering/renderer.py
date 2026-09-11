@@ -3,8 +3,8 @@
 import re
 from pathlib import PurePosixPath
 
-from repoatlas.parser import build_signature
-from repoatlas.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
+from repoatlas.core.parser import build_signature
+from repoatlas.core.symbols import FileInfo, FunctionInfo, RepositoryInfo
 
 
 DEFAULT_DESCRIPTION = "No description available."

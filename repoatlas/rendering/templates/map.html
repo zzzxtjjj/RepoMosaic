@@ -406,6 +406,18 @@
     .description-block h3 { margin: 0 0 10px; font-size: 0.83rem; letter-spacing: 0.08em; text-transform: uppercase; }
     .description-block p { margin: 0; color: #34435c; line-height: 1.7; white-space: pre-wrap; }
 
+    .semantic-summary {
+      margin-top: 22px;
+      padding: 15px 17px;
+      border-left: 3px solid #5278aa;
+      border-radius: 0 10px 10px 0;
+      background: #eaf1fa;
+    }
+
+    .semantic-summary[hidden] { display: none; }
+    .semantic-summary h3 { margin: 0 0 7px; color: #294e7a; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .semantic-summary p { margin: 0; color: #1e3654; line-height: 1.65; white-space: pre-wrap; }
+
     .code-viewer {
       margin-top: 28px;
       overflow: hidden;
@@ -498,7 +510,7 @@
         <div class="panel-header">
           <div class="panel-heading">
             <p class="eyebrow" id="map-title">Repository map</p>
-            <p class="interaction-hint">Click to inspect · Double-click a symbol to open in VS Code</p>
+            <p class="interaction-hint">Click a node to inspect</p>
           </div>
           <div class="toolbar">
             <button type="button" id="expand-all">Expand all</button>
@@ -517,16 +529,20 @@
         <div class="source-location" id="source-location" hidden>
           <span id="source-path"></span>
           <span aria-hidden="true">·</span>
-          <a id="source-lines" href="#">L1</a>
+          <span id="source-lines">L1</span>
         </div>
         <div class="detail-actions">
-          <a class="vscode-action" id="open-vscode" href="#" hidden>Open in VS Code</a>
+          <a class="vscode-action" id="open-vscode" href="#" hidden>Open File in VS Code</a>
         </div>
         <dl class="detail-grid" id="detail-grid"></dl>
         <div class="description-block">
           <h3>Description</h3>
           <p id="detail-description">Select a node to inspect its details.</p>
         </div>
+        <section class="semantic-summary" id="semantic-summary" hidden aria-labelledby="semantic-summary-title">
+          <h3 id="semantic-summary-title">AI Summary</h3>
+          <p id="semantic-summary-text"></p>
+        </section>
         <section class="code-viewer" id="code-viewer" hidden aria-labelledby="code-viewer-title">
           <div class="code-viewer-header">
             <span id="code-viewer-title">Source code</span>
@@ -665,10 +681,6 @@
       meta.textContent = lineRange(item.node) || typeLabels[item.node.type];
       button.append(label, meta);
       button.addEventListener("click", () => selectNode(item.node, button));
-      if (["class", "method", "function"].includes(item.node.type)) {
-        button.addEventListener("dblclick", () => openInVSCode(item.node.vscode_uri));
-        button.title = "Double-click to open in VS Code";
-      }
       row.append(button);
       listItem.append(row);
 
@@ -760,13 +772,12 @@
 
       const sourceLocation = document.getElementById("source-location");
       const sourceLines = document.getElementById("source-lines");
-      sourceLocation.hidden = !node.vscode_uri;
+      sourceLocation.hidden = !node.path;
       document.getElementById("source-path").textContent = node.path || "";
       sourceLines.textContent = lineRange(node);
-      sourceLines.href = node.vscode_uri || "#";
 
       const vscodeAction = document.getElementById("open-vscode");
-      vscodeAction.hidden = !node.vscode_uri;
+      vscodeAction.hidden = node.type !== "file" || !node.vscode_uri;
       vscodeAction.href = node.vscode_uri || "#";
 
       const grid = document.getElementById("detail-grid");
@@ -777,6 +788,10 @@
         grid.append(detailCard("Parameters", node.parameters.length ? node.parameters.join(", ") : "None", true));
       }
       document.getElementById("detail-description").textContent = node.docstring || "No description available.";
+      const semanticSummary = document.getElementById("semantic-summary");
+      const semanticSummaryText = document.getElementById("semantic-summary-text");
+      semanticSummary.hidden = !node.semantic_summary;
+      semanticSummaryText.textContent = node.semantic_summary || "";
       renderSource(node);
     }
 
@@ -819,11 +834,9 @@
 
     document.getElementById("expand-all").addEventListener("click", () => setAllBranches(true));
     document.getElementById("collapse-all").addEventListener("click", () => setAllBranches(false));
-    ["open-vscode", "source-lines"].forEach(id => {
-      document.getElementById(id).addEventListener("click", event => {
-        event.preventDefault();
-        openInVSCode(event.currentTarget.href);
-      });
+    document.getElementById("open-vscode").addEventListener("click", event => {
+      event.preventDefault();
+      openInVSCode(event.currentTarget.href);
     });
     selectNode(repositoryDescriptor().node, document.querySelector('.node[data-type="repository"]'));
   </script>
