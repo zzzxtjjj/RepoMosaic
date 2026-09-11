@@ -27,10 +27,10 @@ async def fetch_data(url):
 
     result = parse_python_file(sample)
 
-    class_info = result["classes"][0]
-    method_info = result["methods"][0]
-    function_info = result["functions"][0]
-    async_function_info = result["functions"][1]
+    class_info = result.classes[0]
+    method_info = result.methods[0]
+    function_info = result.functions[0]
+    async_function_info = result.functions[1]
 
     # 检查类信息
     assert class_info.name == "Robot"

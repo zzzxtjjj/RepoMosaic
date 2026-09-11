@@ -1,10 +1,10 @@
 import ast
 from pathlib import Path
-from repoatlas.symbols import FunctionInfo, ClassInfo
+from repoatlas.symbols import FunctionInfo, ClassInfo, FileInfo
 
 
 # 解析单个 Python 文件，遍历 AST，并统一返回其中的顶层函数、类和类方法的结构化信息
-def parse_python_file(file_path: str) -> dict[str, list]:
+def parse_python_file(file_path: str | Path) -> FileInfo:
 
     path = Path(file_path)
 
@@ -13,7 +13,7 @@ def parse_python_file(file_path: str) -> dict[str, list]:
     tree = ast.parse(source)
 
     functions: list[FunctionInfo] = []
-    classes: list[dict] = []
+    classes: list[ClassInfo] = []
     methods: list[FunctionInfo] = []
 
     for node in tree.body:
@@ -30,11 +30,12 @@ def parse_python_file(file_path: str) -> dict[str, list]:
                     method_info.class_name = node.name
                     methods.append(method_info)
 
-    return {
-        "functions": functions,
-        "classes": classes,
-        "methods": methods,
-    }
+    return FileInfo(
+        path=path.as_posix(),
+        functions=functions,
+        classes=classes,
+        methods=methods,
+    )
 
 
 # 提取信息
