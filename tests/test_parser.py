@@ -1,5 +1,5 @@
-from repoatlas.parser import parse_python_file, build_signature
-from repoatlas.symbols import FunctionInfo
+from repoatlas.core.parser import parse_python_file, build_signature
+from repoatlas.core.symbols import FunctionInfo
 
 
 # 测试 Python 文件解析：验证类、普通函数、异步函数、方法、参数、行号和 docstring

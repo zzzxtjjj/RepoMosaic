@@ -39,12 +39,5 @@ def scan_repository(repo_path: str) -> list[str]:
             continue
         # 不管用户是 Windows、macOS 还是 Linux，都统一得到 / 风格的路径
         files.append(relative_path.as_posix())
-        
+
     return files
-
-
-if __name__ == "__main__":
-    result = scan_repository("D:/projects/repoatlas")
-
-    for file in result:
-        print(file)

@@ -1,4 +1,4 @@
-from repoatlas.analyzer import analyze_repository
+from repoatlas.core.analyzer import analyze_repository
 
 
 # 测试整个仓库分析流程：扫描仓库中的 Python 文件，并返回对应的 FileInfo 结果

@@ -1,6 +1,6 @@
 import ast
 from pathlib import Path
-from repoatlas.symbols import FunctionInfo, ClassInfo, FileInfo
+from repoatlas.core.symbols import FunctionInfo, ClassInfo, FileInfo
 
 
 # 解析单个 Python 文件，遍历 AST，并统一返回其中的顶层函数、类和类方法的结构化信息
@@ -82,6 +82,3 @@ def extract_class_info(node: ast.ClassDef) -> ClassInfo:
         end_line=node.end_lineno,
         docstring=extract_docstring(node),
     )
-
-
-# 从普通函数或异步函数的 AST 节点中提取名称、参数、行号和 docstring 等结构化信息

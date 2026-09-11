@@ -1,4 +1,4 @@
-from repoatlas.scanner import scan_repository
+from repoatlas.core.scanner import scan_repository
 import pytest
 
 def test_scan_repository(tmp_path):

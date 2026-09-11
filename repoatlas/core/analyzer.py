@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from repoatlas.scanner import scan_repository
-from repoatlas.parser import parse_python_file
-from repoatlas.symbols import RepositoryInfo, FileInfo
+from repoatlas.core.scanner import scan_repository
+from repoatlas.core.parser import parse_python_file
+from repoatlas.core.symbols import RepositoryInfo, FileInfo
 
 
 # 分析整个代码仓库：扫描文件，并解析其中所有 Python 文件，最终生成 RepositoryInfo
