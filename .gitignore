@@ -1,4 +1,9 @@
 .venv/
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
+*.egg-info/
+build/
+dist/
+repoatlas_output/
+output/
