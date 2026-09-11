@@ -1,9 +1,10 @@
 import ast
 from pathlib import Path
+from repoatlas.symbols import FunctionInfo, ClassInfo
 
 
 # 解析单个 Python 文件，遍历 AST，并统一返回其中的顶层函数、类和类方法的结构化信息
-def parse_python_file(file_path: str) -> dict[str, list[str]]:
+def parse_python_file(file_path: str) -> dict[str, list]:
 
     path = Path(file_path)
 
@@ -11,9 +12,9 @@ def parse_python_file(file_path: str) -> dict[str, list[str]]:
 
     tree = ast.parse(source)
 
-    functions: list[str] = []
+    functions: list[FunctionInfo] = []
     classes: list[dict] = []
-    methods: list[str] = []
+    methods: list[FunctionInfo] = []
 
     for node in tree.body:
 
@@ -26,7 +27,7 @@ def parse_python_file(file_path: str) -> dict[str, list[str]]:
             for child in node.body:
                 if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     method_info = extract_function_info(child)
-                    method_info["class_name"] = node.name
+                    method_info.class_name = node.name
                     methods.append(method_info)
 
     return {
@@ -37,19 +38,20 @@ def parse_python_file(file_path: str) -> dict[str, list[str]]:
 
 
 # 提取信息
-def extract_function_info(node: ast.FunctionDef) -> dict:
-    return {
-        "name": node.name,
-        "start_line": node.lineno,
-        "end_line": node.end_lineno,
-        "parameters": [arg.arg for arg in node.args.args],
-        "docstring": extract_docstring(node)
-    }
+def extract_function_info(node: ast.FunctionDef | ast.AsyncFunctionDef) -> FunctionInfo:
+
+    return FunctionInfo(
+        name=node.name,
+        start_line=node.lineno,
+        end_line=node.end_lineno,
+        parameters=[arg.arg for arg in node.args.args],
+        docstring=extract_docstring(node),
+    )
 
 
 # 根据函数结构化信息生成适合思维导图展示的函数签名，并隐藏 self / cls
-def build_signature(function_info: dict, is_method: bool = False) -> str:
-    parameters = function_info["parameters"]
+def build_signature(function_info: FunctionInfo, is_method: bool = False) -> str:
+    parameters = function_info.parameters
 
     if is_method and parameters:
         first_parameter = parameters[0]
@@ -59,7 +61,7 @@ def build_signature(function_info: dict, is_method: bool = False) -> str:
 
     parameter_text = ", ".join(parameters)
 
-    return f'{function_info["name"]}({parameter_text})'
+    return f'{function_info.name}({parameter_text})'
 
 
 # 提取函数、方法或类中的 docstring；如果没有 docstring，则返回空字符串
@@ -72,15 +74,13 @@ def extract_docstring(node: ast.AST) -> str:
 
 
 # 从类的 AST 节点中提取类名、起止行号和 docstring 等结构化信息
-def extract_class_info(node: ast.ClassDef) -> dict:
-    return {
-        "name": node.name,
-        "start_line": node.lineno,
-        "end_line": node.end_lineno,
-        "docstring": extract_docstring(node),
-    }
+def extract_class_info(node: ast.ClassDef) -> ClassInfo:
+    return ClassInfo(
+        name=node.name,
+        start_line=node.lineno,
+        end_line=node.end_lineno,
+        docstring=extract_docstring(node),
+    )
 
 
 # 从普通函数或异步函数的 AST 节点中提取名称、参数、行号和 docstring 等结构化信息
-
-    

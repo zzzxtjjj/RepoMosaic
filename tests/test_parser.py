@@ -1,7 +1,8 @@
 from repoatlas.parser import parse_python_file, build_signature
+from repoatlas.symbols import FunctionInfo
 
 
-# 测试 Python 文件解析功能：验证类、普通函数、异步函数、方法、参数、行号和 docstring 是否能被正确提取
+# 测试 Python 文件解析：验证类、普通函数、异步函数、方法、参数、行号和 docstring
 def test_parse_python_file(tmp_path):
     sample = tmp_path / "sample.py"
 
@@ -31,52 +32,78 @@ async def fetch_data(url):
     function_info = result["functions"][0]
     async_function_info = result["functions"][1]
 
-    assert class_info["name"] == "Robot"
-    assert class_info["docstring"] == "Control the robot."
-    assert class_info["start_line"] == 2
-    assert class_info["end_line"] == 7
+    # 检查类信息
+    assert class_info.name == "Robot"
+    assert class_info.docstring == "Control the robot."
+    assert class_info.start_line == 2
+    assert class_info.end_line == 7
 
-    assert method_info["name"] == "move"
-    assert method_info["class_name"] == "Robot"
-    assert method_info["parameters"] == ["self"]
-    assert method_info["docstring"] == "Move the robot."
+    # 检查类方法
+    assert method_info.name == "move"
+    assert method_info.class_name == "Robot"
+    assert method_info.parameters == ["self"]
+    assert method_info.docstring == "Move the robot."
 
-    assert function_info["name"] == "calculate_distance"
-    assert function_info["parameters"] == []
-    assert function_info["docstring"] == "Calculate the distance."
+    # 检查普通函数
+    assert function_info.name == "calculate_distance"
+    assert function_info.parameters == []
+    assert function_info.docstring == "Calculate the distance."
 
-    assert async_function_info["name"] == "fetch_data"
-    assert async_function_info["parameters"] == ["url"]
-    assert async_function_info["docstring"] == "Fetch data from a URL."
+    # 检查异步函数
+    assert async_function_info.name == "fetch_data"
+    assert async_function_info.parameters == ["url"]
+    assert async_function_info.docstring == "Fetch data from a URL."
 
 
-# 测试函数签名生成：普通函数保留所有参数，实例方法隐藏 self，类方法隐藏 cls，静态方法保留真实参数
+# 测试函数签名生成：普通函数保留参数，实例方法隐藏 self，类方法隐藏 cls
 def test_build_signature():
+    normal_function = FunctionInfo(
+        name="add",
+        start_line=1,
+        end_line=2,
+        parameters=["a", "b"],
+        docstring="",
+    )
 
-    normal_function = {
-        "name": "add",
-        "parameters": ["a", "b"],
-    }
+    instance_method = FunctionInfo(
+        name="move",
+        start_line=1,
+        end_line=2,
+        parameters=["self", "position", "speed"],
+        docstring="",
+        class_name="Robot",
+    )
 
-    instance_method = {
-        "name": "move",
-        "parameters": ["self", "position", "speed"],
-    }
+    class_method = FunctionInfo(
+        name="create",
+        start_line=1,
+        end_line=2,
+        parameters=["cls", "config"],
+        docstring="",
+        class_name="Robot",
+    )
 
-    class_method = {
-        "name": "create",
-        "parameters": ["cls", "config"],
-    }
-
-    static_method = {
-        "name": "calculate",
-        "parameters": ["x", "y"],
-    }
+    static_method = FunctionInfo(
+        name="calculate",
+        start_line=1,
+        end_line=2,
+        parameters=["x", "y"],
+        docstring="",
+        class_name="Math",
+    )
 
     assert build_signature(normal_function) == "add(a, b)"
+    assert build_signature(
+        instance_method,
+        is_method=True,
+    ) == "move(position, speed)"
 
-    assert build_signature(instance_method, is_method=True) == "move(position, speed)"
+    assert build_signature(
+        class_method,
+        is_method=True,
+    ) == "create(config)"
 
-    assert build_signature(class_method, is_method=True) == "create(config)"
-
-    assert build_signature(static_method, is_method=True) == "calculate(x, y)"
+    assert build_signature(
+        static_method,
+        is_method=True,
+    ) == "calculate(x, y)"
