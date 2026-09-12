@@ -18,9 +18,13 @@ dependencies = [
 dev = [
     "pytest>=8",
 ]
+mcp = [
+    "mcp>=2,<3",
+]
 
 [project.scripts]
 repoatlas = "repoatlas.cli:main"
+repoatlas-mcp = "repoatlas.mcp_server:main"
 
 [tool.setuptools.dynamic]
 version = {attr = "repoatlas.__version__"}
