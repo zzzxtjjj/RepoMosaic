@@ -1,154 +1,166 @@
+**English** | [简体中文](README.zh-CN.md)
+
 # RepoAtlas
 
-Human-first and agent-readable repository knowledge maps.
+Turn an unfamiliar Python repository into a human-first, agent-readable knowledge map.
 
-## What is RepoAtlas?
+RepoAtlas runs static analysis locally and produces a Markdown overview, structured JSON, and an interactive Repository Knowledge Canvas. Optional, opt-in LLM summaries add concise semantic explanations in eight supported languages.
 
-RepoAtlas uses static analysis to turn a code repository into a browsable knowledge map. It extracts Python files, classes, functions, methods, signatures, line ranges, and docstrings, then presents that information as Markdown, Mermaid, JSON, and an interactive HTML map.
+## Key features
 
-Static repository analysis runs locally. RepoAtlas can optionally generate multilingual semantic summaries through a user-configured LLM provider.
-
-## Current Features
-
-- Repository scanning with common development directories ignored
-- Python AST analysis
-- Class, function, and method extraction
-- Function and method signatures
-- Source line ranges and docstrings
-- Repository-level structured data
-- Markdown knowledge map with Mermaid overview
-- Interactive, expandable HTML visualization with a detail panel
-- Function, class, method, and file semantic summaries
-- Eight supported summary languages
-- OpenAI-compatible LLM client abstraction
-
-## Why RepoAtlas?
-
-A normal file tree tells you where code lives. RepoAtlas is being built to help both people and coding agents understand the structure and responsibilities inside a repository: which files contain important symbols, how classes and methods are organized, what parameters functions accept, and where each symbol is defined.
-
-Structural facts, docstrings, and optional semantic summaries provide that context without coupling rendering to an LLM provider.
+- Local Python AST analysis for files, classes, methods, functions, signatures, line ranges, and docstrings
+- Interactive Knowledge Canvas with search, filters, source viewing, and VS Code handoff
+- Optional grounded AI semantic summaries through an OpenAI-compatible provider
+- User-level API-key storage through the operating system credential store
+- Stable structured data for Coding Agents and an optional MCP server
+- Markdown, Mermaid, JSON, and self-contained HTML outputs
 
 ## Quick Start
 
-Install RepoAtlas and run the first-time setup:
+### 1. Install RepoAtlas
 
-```powershell
+Recommended:
+
+```bash
+uv tool install repoatlas
+```
+
+This installs RepoAtlas in an isolated environment and makes the `repoatlas` command available globally. Install it once, then use it from different repositories without activating a dedicated RepoAtlas virtual environment each time.
+
+Alternatively:
+
+```bash
 pip install repoatlas
+```
+
+If you install RepoAtlas inside a Python virtual environment, activate that environment whenever you want to use the `repoatlas` command.
+
+### 2. Save your API key once
+
+```bash
+repoatlas auth set
+```
+
+The key is entered through a hidden prompt and stored in the system credential store.
+
+### 3. Configure a project
+
+```bash
+cd path/to/project
 repoatlas init
-# Answer the model, base URL, and output-language prompts.
-$env:REPOATLAS_API_KEY = "<your-provider-api-key>"
+```
+
+Answer the model, base URL, and output-language prompts. RepoAtlas writes `.repoatlas.toml` for you.
+
+### 4. Build the knowledge map
+
+```bash
 repoatlas .
 ```
 
-For local static analysis without model API calls:
+### 5. Explore
 
-```powershell
+Open `repoatlas_output/map.html` in a browser, or read `repoatlas_output/STRUCTURE.md` on GitHub or in VS Code.
+
+## Static-only mode
+
+No API key or model service is needed for local static analysis:
+
+```bash
 repoatlas . --no-llm
 ```
 
-`repoatlas init` writes `.repoatlas.toml` automatically and never stores the API key. Advanced users can create the commented manual-editing version with `repoatlas init --template`. The command refuses to replace an existing configuration unless `--force` is supplied.
+`--no-llm` prevents model API calls even when a project contains LLM settings.
 
-Command-line options take precedence over `.repoatlas.toml`, which takes precedence over built-in defaults. `--no-llm` always disables LLM features.
+## Authentication
 
-The existing command-line options remain available:
-
-```powershell
-$env:REPOATLAS_API_KEY = "<your-provider-api-key>"
-repoatlas . `
-  --provider openai-compatible `
-  --model your-model `
-  --base-url https://your-provider.example/v1 `
-  --lang en
+```bash
+repoatlas auth set
+repoatlas auth status
+repoatlas auth clear
 ```
 
-`python -m repoatlas` accepts the same options as the installed `repoatlas` command. Canonical summary language codes are `en`, `zh-CN`, `ja`, `ko`, `de`, `it`, `pt`, and `es`; common names and aliases such as `English`, `中文`, and `日本語` are accepted and normalized to these codes.
+- `set` saves one default RepoAtlas credential using Windows Credential Manager, macOS Keychain, or a supported Linux keyring backend.
+- `status` reports only whether a key is available and its source; it never prints the key.
+- `clear` removes only the stored RepoAtlas credential.
 
-## Example
+For temporary use, the `REPOATLAS_API_KEY` environment variable overrides the stored credential. It is not necessary to save a separate key for every repository.
 
-Given a small repository:
+## Generated outputs
+
+By default, RepoAtlas creates `repoatlas_output/`:
+
+- `map.html` — self-contained interactive Repository Knowledge Canvas
+- `STRUCTURE.md` — detailed Markdown map with a Mermaid overview
+- `structure.json` — machine-readable repository and symbol data
+
+Use `--output-dir PATH` to choose another directory.
+
+## How RepoAtlas works
 
 ```text
-Repository
-├── robot.py
-│   └── class RobotController
-│       ├── move(position)
-│       └── stop()
-└── utils.py
-    ├── calculate_distance(start, end)
-    └── load_config()
+Local repository
+  → scanner
+  → Python AST parser
+  → RepositoryInfo
+      ├── Markdown renderer
+      ├── JSON / Knowledge Canvas renderer
+      └── optional grounded semantic summaries
 ```
 
-RepoAtlas preserves signatures, line ranges, and available docstrings in the generated maps. A runnable analysis target is available in `examples/sample_repo/`.
+Static analysis remains the source of structural facts. When LLM mode is enabled, only relevant source or compressed symbol context is sent to the configured provider for summaries; generated text does not replace original docstrings.
 
-## Output
+## Coding Agent and MCP usage
 
-By default, `repoatlas .` creates `repoatlas_output/` containing:
+The Python Agent API exposes repository structure, symbol search, and source lookup without requiring a UI. For MCP clients, install the optional dependency and start a server bound to one repository:
 
-- `STRUCTURE.md` — human-readable details and a Mermaid mindmap
-- `structure.json` — machine-readable repository structure
-- `map.html` — interactive knowledge tree and symbol detail panel
-
-Use `--output-dir PATH` to choose another output directory.
-
-## Architecture
-
-```text
-Scanner
-  ↓
-Parser
-  ↓
-Analyzer
-  ↓
-RepositoryInfo
-  ├── Renderer   → STRUCTURE.md
-  └── Visualizer → structure.json + map.html
+```bash
+pip install "repoatlas[mcp]"
+repoatlas-mcp path/to/project
 ```
 
-The optional semantic flow looks like this:
+The MCP server uses stdio and exposes `get_repository_structure`, `find_symbol`, and `get_symbol_source` tools. Configure the command in your MCP client according to that client's documentation.
 
-```text
-LLMConfig
-  ↓
-LLM Factory
-  ↓
-OpenAICompatibleClient
-  ↓
-Semantic Summarizer
-  ↓
-SemanticSummary index
-  ↓
-Visualizer
+## Configuration reference
+
+Interactive setup:
+
+```bash
+repoatlas init
 ```
 
-## Network and privacy
+Advanced users can create a commented template with `repoatlas init --template`. Existing configuration is protected unless `--force` is supplied.
 
-Local static analysis does not call a model API. LLM summaries are opt-in and are enabled only when the provider, model, and base URL options are supplied without `--no-llm`.
+Project configuration contains non-secret LLM settings:
 
-When LLM mode is enabled, RepoAtlas sends relevant source code and repository context to the configured provider. API credentials are read from `REPOATLAS_API_KEY`; never commit this variable or its value to the repository. RepoAtlas does not include API keys in `structure.json`, `map.html`, `STRUCTURE.md`, or other generated outputs.
+```toml
+[llm]
+provider = "openai-compatible"
+model = "your-model"
+base_url = "https://your-provider.example/v1"
+language = "en"
+```
 
-Before enabling LLM features for a private repository, review the selected provider's privacy, retention, and data-use policies.
+CLI options `--provider`, `--model`, `--base-url`, and `--lang` override `.repoatlas.toml`. Supported canonical language codes are `en`, `zh-CN`, `ja`, `ko`, `de`, `it`, `pt`, and `es`.
 
-## Roadmap
+## Privacy and security
 
-- Import and dependency graphs
-- Task-aware file ranking
-- MCP integration
-- More programming languages
-- Incremental analysis and caching
-
-Roadmap items are not implemented features.
+- Static analysis and `--no-llm` run locally without model API calls.
+- LLM summaries are optional and opt-in.
+- LLM mode sends relevant source code and repository context to the user-configured provider.
+- Credentials are resolved from `REPOATLAS_API_KEY` first, then the system credential store.
+- API keys are never written to `.repoatlas.toml`, `structure.json`, `map.html`, `STRUCTURE.md`, or other generated outputs.
+- Never commit API keys. Review your provider's privacy, retention, and data-use policies before analyzing a private repository with LLM features.
 
 ## Development
-
-Install development dependencies and run all tests:
 
 ```bash
 python -m pip install -e ".[dev]"
 python -m pytest
 ```
 
-See `CONTRIBUTING.md` for the short contribution guide.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance.
 
 ## License
 
-RepoAtlas is licensed under the Apache License 2.0. See `LICENSE`.
+RepoAtlas is licensed under the [Apache License 2.0](LICENSE).
