@@ -39,3 +39,24 @@ def test_repository_path_is_file(tmp_path):
 
     with pytest.raises(NotADirectoryError):
         scan_repository(fake_repo)
+
+
+def test_scanner_skips_symlink_to_file_outside_repository(tmp_path):
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    safe_file = repo_dir / "safe.py"
+    safe_file.write_text("value = 1\n", encoding="utf-8")
+
+    outside_file = tmp_path / "outside.py"
+    outside_file.write_text("secret = True\n", encoding="utf-8")
+    outside_link = repo_dir / "outside_link.py"
+
+    try:
+        outside_link.symlink_to(outside_file)
+    except (OSError, NotImplementedError) as error:
+        pytest.skip(f"Symlink creation is unavailable: {error}")
+
+    result = scan_repository(repo_dir)
+
+    assert "safe.py" in result
+    assert "outside_link.py" not in result

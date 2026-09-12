@@ -6,6 +6,7 @@ from pathlib import Path, PureWindowsPath
 from urllib.parse import quote
 
 from repoatlas.core.parser import build_signature
+from repoatlas.core.paths import resolve_repository_file
 from repoatlas.core.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
 from repoatlas.rendering.renderer import render_structure_markdown
 from repoatlas.semantic.index import build_summary_index, make_summary_key
@@ -43,7 +44,7 @@ def build_vscode_uri(
 
 def _read_source(root_path: str | Path, relative_path: str) -> str:
     """读取可视化所需源码；文件不可用时返回空字符串。"""
-    source_path = Path(root_path).expanduser() / Path(relative_path)
+    source_path = resolve_repository_file(root_path, relative_path)
     try:
         return source_path.read_text(encoding="utf-8", errors="replace")
     except OSError:
@@ -278,7 +279,7 @@ def render_visual_map(
 
     markdown_path = destination / "STRUCTURE.md"
     markdown_path.write_text(
-        render_structure_markdown(repository),
+        render_structure_markdown(repository, output_dir=destination),
         encoding="utf-8",
     )
 

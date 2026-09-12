@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from repoatlas.core.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
 from repoatlas.rendering.visualizer import (
     build_vscode_uri,
@@ -321,6 +323,27 @@ def test_full_source_and_symbol_ranges_are_preserved(tmp_path):
     assert file_data["end_line"] == 44
     assert file_data["methods"][0]["start_line"] == 10
     assert file_data["methods"][0]["end_line"] == 18
+
+
+def test_repository_serialization_rejects_source_outside_root(tmp_path):
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    outside_file = tmp_path / "outside.py"
+    outside_file.write_text("secret = True\n", encoding="utf-8")
+    repository = RepositoryInfo(
+        root_path=repo_dir.as_posix(),
+        files=[
+            FileInfo(
+                path="../outside.py",
+                functions=[],
+                classes=[],
+                methods=[],
+            )
+        ],
+    )
+
+    with pytest.raises(ValueError, match="escapes repository root"):
+        repository_to_dict(repository)
 
 
 def test_light_canvas_contains_offline_navigation_controls(tmp_path):

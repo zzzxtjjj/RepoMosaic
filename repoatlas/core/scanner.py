@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from repoatlas.core.paths import resolve_repository_file
+
 
 IGNORED_DIRS = {
     ".git",
@@ -12,13 +14,13 @@ IGNORED_DIRS = {
 }
 
 
-def scan_repository(repo_path: str) -> list[str]:
+def scan_repository(repo_path: str | Path) -> list[str]:
     """
     Scan a repository and return file paths relative
     to the repository root.
     """
 
-    repo = Path(repo_path)
+    repo = Path(repo_path).expanduser().resolve()
 
     if not repo.exists():
         raise FileNotFoundError(f"Repository path does not exist: {repo}")
@@ -37,6 +39,13 @@ def scan_repository(repo_path: str) -> list[str]:
 
         if any(part in IGNORED_DIRS for part in relative_path.parts):
             continue
+
+        try:
+            resolve_repository_file(repo, relative_path)
+        except ValueError:
+            # 跳过解析后指向仓库外部的文件符号链接。
+            continue
+
         # 不管用户是 Windows、macOS 还是 Linux，都统一得到 / 风格的路径
         files.append(relative_path.as_posix())
 
