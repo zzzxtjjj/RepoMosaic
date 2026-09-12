@@ -7,7 +7,7 @@ from repoatlas.core.symbols import RepositoryInfo, FileInfo
 
 # 分析整个代码仓库：扫描文件，并解析其中所有 Python 文件，最终生成 RepositoryInfo
 def analyze_repository(repo_path: str | Path) -> RepositoryInfo:
-    repo = Path(repo_path)
+    repo = Path(repo_path).expanduser().resolve()
 
     scanned_files = scan_repository(repo)
 

@@ -1,8 +1,12 @@
+from pathlib import Path
+import pytest
 from repoatlas.core.symbols import FunctionInfo, ClassInfo, FileInfo, RepositoryInfo
 from repoatlas.llm.base import LLMClient
 from repoatlas.semantic.prompts import build_function_prompt, build_class_prompt, build_file_prompt
 from pathlib import Path
 from repoatlas.semantic.models import SemanticSummary
+from repoatlas.core.paths import resolve_repository_file
+from repoatlas.semantic.languages import validate_language
 
 
 # 根据函数信息和源码构造 Prompt，调用 LLM，并返回清理后的函数摘要
@@ -69,12 +73,17 @@ def summarize_repository(
     language: str,
     llm: LLMClient,
 ) -> list[SemanticSummary]:
+    language = validate_language(language)
+    
     summaries: list[SemanticSummary] = []
 
     repo_root = Path(repository.root_path)
 
     for file_info in repository.files:
-        full_path = repo_root / file_info.path
+        full_path = resolve_repository_file(
+            repository.root_path,
+            file_info.path,
+        )
 
         # 为当前文件生成整体职责摘要
         file_summary_text = summarize_file(

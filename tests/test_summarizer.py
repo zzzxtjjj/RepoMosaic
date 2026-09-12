@@ -1,6 +1,6 @@
 from repoatlas.core.symbols import FunctionInfo, ClassInfo, FileInfo
 from repoatlas.semantic.summarizer import summarize_function, summarize_class, summarize_file
-
+import pytest
 
 # 模拟一个假的 LLM，避免测试时真的调用外部 API
 class FakeLLM:
@@ -324,3 +324,54 @@ def helper(value):
     assert method_summary.target_type == "method"
 
     assert len(fake_llm.prompts) == 4
+
+
+# 验证不支持的语言会在任何 LLM 调用之前被拒绝
+def test_summarize_repository_rejects_unsupported_language(
+    tmp_path,
+):
+    source_file = tmp_path / "main.py"
+
+    source_file.write_text(
+        """
+def hello():
+    return "hello"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    repository = RepositoryInfo(
+        root_path=tmp_path.as_posix(),
+        files=[
+            FileInfo(
+                path="main.py",
+                functions=[
+                    FunctionInfo(
+                        name="hello",
+                        start_line=1,
+                        end_line=2,
+                        parameters=[],
+                        docstring="",
+                    )
+                ],
+                classes=[],
+                methods=[],
+            )
+        ],
+    )
+
+    class FailIfCalledLLM:
+        def generate(self, prompt: str) -> str:
+            raise AssertionError(
+                "LLM should not be called for unsupported language"
+            )
+
+    with pytest.raises(
+        ValueError,
+        match="Unsupported language",
+    ):
+        summarize_repository(
+            repository=repository,
+            language="ru",
+            llm=FailIfCalledLLM(),
+        )
