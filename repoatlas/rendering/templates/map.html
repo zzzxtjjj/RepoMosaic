@@ -1,844 +1,448 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Interactive RepoAtlas repository knowledge map">
   <title>__REPOSITORY_NAME__ · RepoAtlas</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23101b33'/%3E%3Ccircle cx='20' cy='20' r='6' fill='%235de4c7'/%3E%3Ccircle cx='44' cy='20' r='6' fill='%237ea6ff'/%3E%3Ccircle cx='32' cy='44' r='6' fill='%23f5b971'/%3E%3Cpath d='M25 22l14 0M23 25l7 14M41 25l-7 14' stroke='%23dce7ff' stroke-width='3' fill='none'/%3E%3C/svg%3E">
   <style>
     :root {
-      color-scheme: dark;
-      --page: #07101f;
-      --panel: #0d1729;
-      --panel-raised: #111e34;
-      --detail: #f4f7fb;
-      --detail-text: #172033;
-      --muted: #94a3bc;
-      --detail-muted: #60708b;
-      --line: #2a3a55;
-      --connector: #6687b8;
-      --connector-strong: #5de4c7;
-      --connector-width: 2px;
-      --connector-path-width: 3px;
-      --accent: #5de4c7;
-      --accent-soft: rgba(93, 228, 199, 0.12);
-      --blue: #7ea6ff;
-      --orange: #f5b971;
-      --shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+      color-scheme: light;
+      --page: #f7f8fa; --panel: #ffffff; --text: #172033; --muted: #667085;
+      --border: #e4e7ec; --accent: #2563eb; --selected: #eff6ff;
+      --connector: #475467; --connector-width: 2px; --connector-path-width: 3px;
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text); background: var(--page);
     }
-
     * { box-sizing: border-box; }
-
-    html, body { min-height: 100%; }
-
-    body {
-      margin: 0;
-      background:
-        radial-gradient(circle at 15% 0%, rgba(49, 87, 150, 0.22), transparent 34rem),
-        var(--page);
-      color: #e8eefb;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 16px;
-      line-height: 1.5;
+    body { margin: 0; }
+    button, input { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { cursor: pointer; color: inherit; }
+    button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+      outline: 3px solid #93b4ff; outline-offset: 3px;
     }
-
-    button { font: inherit; }
-
-    .app-shell {
-      min-height: 100vh;
-      display: grid;
-      grid-template-rows: auto 1fr;
-    }
-
-    .topbar {
-      min-height: 78px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-      padding: 16px clamp(20px, 3vw, 42px);
-      border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-      background: rgba(7, 16, 31, 0.84);
-      backdrop-filter: blur(18px);
-    }
-
-    .brand, .repo-heading, .toolbar, .node-row, .stat-list { display: flex; align-items: center; }
-
-    .brand { gap: 12px; min-width: 180px; }
-
-    .brand-mark {
-      display: grid;
-      place-items: center;
-      width: 38px;
-      height: 38px;
-      border: 1px solid rgba(93, 228, 199, 0.45);
-      border-radius: 11px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-      font-weight: 800;
-    }
-
-    .brand-name { font-size: 1rem; font-weight: 750; letter-spacing: 0.02em; }
-    .brand-label { color: var(--muted); font-size: 0.78rem; }
-
-    .repo-heading {
-      flex: 1;
-      min-width: 0;
-      justify-content: center;
-      gap: 10px;
-      text-align: center;
-    }
-
-    .repo-heading h1 {
-      overflow: hidden;
-      margin: 0;
-      font-size: clamp(1.05rem, 2vw, 1.35rem);
-      font-weight: 680;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .repo-heading span { color: var(--muted); }
-
-    .stat-list { justify-content: flex-end; gap: 8px; min-width: 180px; }
-
-    .stat {
-      padding: 5px 9px;
-      border: 1px solid rgba(148, 163, 184, 0.18);
-      border-radius: 999px;
-      color: #c4d0e4;
-      font-size: 0.78rem;
-      white-space: nowrap;
-    }
-
-    .workspace {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
-      min-height: 0;
-      padding: clamp(16px, 2.5vw, 32px);
-      gap: 18px;
-    }
-
-    .map-panel, .detail-panel {
-      min-height: 0;
-      border: 1px solid rgba(148, 163, 184, 0.16);
-      border-radius: 18px;
-      box-shadow: var(--shadow);
-    }
-
-    .map-panel {
-      overflow: hidden;
-      background:
-        linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px),
-        var(--panel);
-      background-size: 24px 24px;
-    }
-
-    .panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-      padding: 15px 18px;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-      background: rgba(13, 23, 41, 0.9);
-    }
-
-    .eyebrow {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-    }
-
-    .panel-heading { display: grid; gap: 2px; }
-
-    .interaction-hint {
-      margin: 0;
-      color: #a7b7cf;
-      font-size: 0.78rem;
-    }
-
-    .toolbar { gap: 8px; }
-
-    .toolbar button {
-      padding: 7px 11px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel-raised);
-      color: #cbd6e9;
-      cursor: pointer;
-      font-size: 0.8rem;
-    }
-
-    .toolbar button:hover, .toolbar button:focus-visible {
-      border-color: var(--blue);
-      color: #fff;
-      outline: none;
-    }
-
-    .tree-scroll {
-      height: calc(100vh - 160px);
-      min-height: 480px;
-      overflow: auto;
-      padding: clamp(20px, 3vw, 34px);
-    }
-
-    .knowledge-tree, .tree-children { margin: 0; padding: 0; list-style: none; }
-    .knowledge-tree { min-width: max-content; }
-
-    .tree-children {
-      position: relative;
-      margin-left: 21px;
-      padding-left: 26px;
-      border-left: var(--connector-width) solid var(--connector);
-    }
-
-    .tree-children[hidden] { display: none; }
-
-    .tree-item { position: relative; padding: 6px 0; }
-
-    .tree-children > .tree-item::before,
-    .tree-children > .tree-group::before {
-      content: "";
-      position: absolute;
-      top: 24px;
-      left: -26px;
-      width: 20px;
-      border-top: var(--connector-width) solid var(--connector);
-    }
-
-    .node-row { gap: 7px; }
-
-    .toggle, .toggle-spacer {
-      flex: 0 0 28px;
-      width: 28px;
-      height: 28px;
-    }
-
-    .toggle {
-      display: grid;
-      place-items: center;
-      border: 0;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      transition: transform 150ms ease, color 150ms ease;
-    }
-
-    .toggle[aria-expanded="true"] { transform: rotate(90deg); }
-    .toggle:hover, .toggle:focus-visible { color: #fff; outline: none; }
-
-    .node {
-      display: grid;
-      grid-template-columns: 32px minmax(120px, auto) auto;
-      align-items: center;
-      gap: 10px;
-      min-height: 46px;
-      padding: 7px 12px 7px 8px;
-      border: 1px solid var(--line);
-      border-radius: 11px;
-      background: rgba(17, 30, 52, 0.94);
-      color: #e7eefb;
-      cursor: pointer;
-      text-align: left;
-      transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
-    }
-
-    .node:hover { border-color: #526a91; transform: translateX(2px); }
-    .node:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-    .node:hover { background: rgba(25, 43, 70, 0.98); }
-    .node.ancestor {
-      border-color: #4b8c89;
-      background: rgba(27, 56, 67, 0.94);
-    }
-    .node.selected {
-      border-color: var(--accent);
-      background: #174a4a;
-      box-shadow: 0 0 0 2px rgba(93, 228, 199, 0.18), 0 8px 24px rgba(0, 0, 0, 0.26);
-      transform: translateX(3px);
-    }
-
-    .tree-children > .tree-item.active-path::before,
-    .tree-children > .tree-group.active-path::before {
-      border-top-color: var(--connector-strong);
-      border-top-width: var(--connector-path-width);
-    }
-
-    .tree-item.active-path > .tree-children {
-      border-left-color: var(--connector-strong);
-      border-left-width: var(--connector-path-width);
-    }
-
-    .node-icon {
-      display: grid;
-      place-items: center;
-      width: 30px;
-      height: 30px;
-      border-radius: 8px;
-      background: rgba(126, 166, 255, 0.12);
-      color: var(--blue);
-      font: 700 0.72rem/1 ui-monospace, SFMono-Regular, Consolas, monospace;
-    }
-
-    .node[data-type="repository"] .node-icon { color: var(--accent); background: var(--accent-soft); }
-    .node[data-type="file"] .node-icon { color: #8eb2ff; background: rgba(126, 166, 255, 0.13); }
-    .node[data-type="class"] .node-icon { color: var(--orange); background: rgba(245, 185, 113, 0.12); }
-    .node[data-type="method"] .node-icon { color: #cb9cff; background: rgba(203, 156, 255, 0.12); }
-    .node[data-type="function"] .node-icon { color: #78cfba; background: rgba(120, 207, 186, 0.12); }
-
-    .node-label {
-      max-width: 45vw;
-      overflow: hidden;
-      font: 600 0.9rem/1.3 ui-monospace, SFMono-Regular, Consolas, monospace;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .node-meta { color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
-
-    .tree-group { position: relative; padding: 8px 0; }
-    .group-label { margin: 0 0 4px 36px; color: #7487a6; font-size: 0.75rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
-    .tree-group > .tree-children { margin-left: 20px; }
-
-    .empty-state { color: var(--muted); padding: 24px; }
-
-    .detail-panel {
-      overflow: auto;
-      height: calc(100vh - 128px);
-      min-height: 520px;
-      padding: clamp(24px, 3vw, 34px);
-      background: var(--detail);
-      color: var(--detail-text);
-    }
-
-    .detail-type {
-      display: inline-flex;
-      align-items: center;
-      padding: 5px 9px;
-      border-radius: 999px;
-      background: #dce6f7;
-      color: #425572;
-      font-size: 0.75rem;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .detail-panel h2 {
-      margin: 18px 0 8px;
-      overflow-wrap: anywhere;
-      font: 720 clamp(1.35rem, 2.4vw, 1.9rem)/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
-    }
-
-    .detail-signature {
-      margin: 0 0 26px;
-      color: #4b6285;
-      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-      overflow-wrap: anywhere;
-    }
-
-    .source-location {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 7px;
-      margin: 0 0 18px;
-      color: var(--detail-muted);
-      font: 0.82rem/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
-    }
-
-    .source-location a {
-      color: #285f9d;
-      font-weight: 750;
-      text-decoration: none;
-    }
-
-    .source-location a:hover,
-    .source-location a:focus-visible { text-decoration: underline; }
-
-    .detail-actions { margin: 0 0 24px; }
-
-    .vscode-action {
-      display: inline-flex;
-      align-items: center;
-      min-height: 42px;
-      padding: 9px 15px;
-      border: 1px solid #174a4a;
-      border-radius: 9px;
-      background: #174a4a;
-      color: #fff;
-      font-weight: 750;
-      text-decoration: none;
-      transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
-    }
-
-    .vscode-action:hover {
-      background: #20605d;
-      box-shadow: 0 7px 20px rgba(23, 74, 74, 0.2);
-      transform: translateY(-1px);
-    }
-
-    .vscode-action:focus-visible { outline: 3px solid rgba(40, 95, 157, 0.32); outline-offset: 2px; }
-    .vscode-action[hidden], .source-location[hidden] { display: none; }
-
-    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-    .detail-card {
-      min-width: 0;
-      padding: 13px 14px;
-      border: 1px solid #dbe3ee;
-      border-radius: 11px;
-      background: #fff;
-    }
-
-    .detail-card.wide { grid-column: 1 / -1; }
-    .detail-card dt { margin-bottom: 5px; color: var(--detail-muted); font-size: 0.75rem; font-weight: 750; text-transform: uppercase; }
-    .detail-card dd { margin: 0; overflow-wrap: anywhere; font-size: 0.9rem; }
-    .detail-card code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
-
-    .description-block { margin-top: 28px; }
-    .description-block h3 { margin: 0 0 10px; font-size: 0.83rem; letter-spacing: 0.08em; text-transform: uppercase; }
-    .description-block p { margin: 0; color: #34435c; line-height: 1.7; white-space: pre-wrap; }
-
-    .semantic-summary {
-      margin-top: 22px;
-      padding: 15px 17px;
-      border-left: 3px solid #5278aa;
-      border-radius: 0 10px 10px 0;
-      background: #eaf1fa;
-    }
-
-    .semantic-summary[hidden] { display: none; }
-    .semantic-summary h3 { margin: 0 0 7px; color: #294e7a; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; }
-    .semantic-summary p { margin: 0; color: #1e3654; line-height: 1.65; white-space: pre-wrap; }
-
-    .code-viewer {
-      margin-top: 28px;
-      overflow: hidden;
-      border: 1px solid #ced8e6;
-      border-radius: 12px;
-      background: #0c1525;
-    }
-
-    .code-viewer-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      min-height: 42px;
-      padding: 9px 13px;
-      border-bottom: 1px solid #283a55;
-      color: #b9c8dc;
-      font-size: 0.78rem;
-      font-weight: 750;
-      letter-spacing: 0.07em;
-      text-transform: uppercase;
-    }
-
-    .code-scroll {
-      max-height: 48vh;
-      overflow: auto;
-      padding: 10px 0;
-      color: #dbe7f8;
-      font: 0.82rem/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
-      tab-size: 4;
-    }
-
-    .code-line {
-      display: grid;
-      grid-template-columns: 48px minmax(max-content, 1fr);
-      min-height: 1.65em;
-      padding-right: 16px;
-    }
-
-    .code-line.active { background: rgba(93, 228, 199, 0.12); }
-    .line-number { padding-right: 12px; color: #657a99; text-align: right; user-select: none; }
-    .code-line.active .line-number { color: var(--accent); }
+    [hidden] { display: none !important; }
+    .topbar { height: 64px; display: flex; align-items: center; gap: 22px; padding: 0 24px; background: white; border-bottom: 1px solid var(--border); }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 750; flex-shrink: 0; }
+    .brand-mark { width: 30px; height: 30px; display: grid; place-items: center; color: white; background: var(--accent); border-radius: 8px; font-size: 12px; }
+    .repository-heading { min-width: 100px; max-width: 190px; }
+    .repository-heading strong, .repository-heading small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .repository-heading small { color: var(--muted); font-size: 11px; }
+    .search-wrap { position: relative; flex: 1; max-width: 480px; min-width: 180px; margin: 0 auto; }
+    #repository-search { width: 100%; height: 36px; border: 1px solid var(--border); background: #f9fafb; border-radius: 8px; padding: 0 12px; }
+    .search-results { position: absolute; top: 42px; width: 100%; max-height: 360px; overflow: auto; background: white; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 30px #1720331a; z-index: 10; padding: 5px; }
+    .search-result { display: block; width: 100%; text-align: left; background: white; border: 0; padding: 9px; border-radius: 6px; overflow-wrap: anywhere; }
+    .search-result:hover { background: var(--selected); }
+    .search-result small { display: block; color: var(--muted); }
+    .toolbar { display: flex; gap: 5px; align-items: center; }
+    .control { border: 1px solid var(--border); background: white; padding: 6px 10px; border-radius: 7px; font-size: 12px; white-space: nowrap; }
+    .control:hover { background: #f1f5f9; border-color: #b3c0d0; }
+    .workspace { height: calc(100dvh - 64px); display: grid; grid-template-columns: minmax(0, 2fr) minmax(330px, 1fr); }
+    .workspace.details-collapsed { grid-template-columns: minmax(0, 1fr); }
+    .workspace.details-collapsed .detail-panel { display: none; }
+    .canvas-panel { min-width: 0; position: relative; display: flex; flex-direction: column; overflow: hidden; }
+    .canvas-heading { padding: 20px 24px 14px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    h1 { margin: 0; font-size: 17px; letter-spacing: -.3px; }
+    .subtle { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+    .filters { display: flex; gap: 5px; flex-wrap: wrap; }
+    .filter { background: white; border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px; font-size: 12px; }
+    .filter[aria-pressed="true"] { color: #244579; border-color: #b9ccea; background: #eff6ff; }
+    .filter[aria-pressed="false"] { color: var(--muted); }
+    #knowledge-canvas { position: relative; flex: 1; overflow: hidden; touch-action: none; cursor: grab; background-image: radial-gradient(#dce2eb .8px, transparent .8px); background-size: 20px 20px; }
+    #knowledge-canvas.panning { cursor: grabbing; }
+    #graph-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+    #connectors { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+    .connector { fill: none; stroke: var(--connector); stroke-width: var(--connector-width); vector-effect: non-scaling-stroke; }
+    .connector.active-path { stroke: var(--accent); stroke-width: var(--connector-path-width); }
+    .node-card { position: absolute; width: 224px; height: 88px; }
+    .node { width: 100%; height: 100%; text-align: left; border: 1px solid #ced5df; background: white; border-radius: 11px; padding: 11px 15px; box-shadow: 0 2px 4px #17203306; transition: background .15s, border-color .15s; }
+    .node:hover { background: #f8fafc; border-color: #8294ad; }
+    .node.selected { background: var(--selected); border: 2px solid var(--accent); box-shadow: 0 3px 12px #2563eb1a; padding: 10px 14px; }
+    .node.ancestor { border-color: #7fa7ed; background: #f5f9ff; }
+    .node.match { box-shadow: 0 0 0 3px #f1c96a; }
+    .node.dimmed { opacity: .35; }
+    .node-label { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: 4px; font-size: 14px; font-weight: 650; }
+    .node-meta { display: block; color: var(--muted); font-size: 11px; margin-top: 1px; }
+    .badge { display: inline-block; border-radius: 4px; padding: 1px 5px; font-size: 9px; font-weight: 750; letter-spacing: .7px; text-transform: uppercase; background: #edf0f4; color: #475467; }
+    [data-type="repository"] .badge { background: #e8efff; color: #245ac6; }
+    [data-type="class"] .badge { background: #f2edfb; color: #72509d; }
+    [data-type="function"] .badge { background: #e7f4f0; color: #287464; }
+    [data-type="method"] .badge { background: #fbf1df; color: #8a6427; }
+    [data-type="package"] .node { border-style: dashed; background: #f7f9fc; }
+    .branch-toggle { position: absolute; right: -12px; top: 32px; width: 24px; height: 24px; border: 1px solid #aebacb; background: white; border-radius: 50%; padding: 0; font-size: 16px; }
+    .canvas-bottom { position: absolute; bottom: 18px; left: 24px; right: 24px; display: flex; justify-content: space-between; align-items: end; pointer-events: none; gap: 12px; }
+    .canvas-bottom .toolbar { pointer-events: auto; padding: 5px; background: white; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 3px 10px #17203309; }
+    #zoom-level { min-width: 44px; text-align: center; color: var(--muted); font-size: 12px; }
+    #canvas-status { background: #f7f8fae6; border-radius: 6px; padding: 4px 7px; }
+    .empty-state { position: absolute; top: 16px; left: 24px; color: var(--muted); }
+    .detail-panel { background: white; border-left: 1px solid var(--border); overflow: auto; padding: 22px 24px 36px; }
+    .detail-eyebrow { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 24px; }
+    #detail-name { font-size: 23px; line-height: 1.3; margin: 8px 0; overflow-wrap: anywhere; letter-spacing: -.5px; }
+    .detail-signature { color: var(--muted); font: 12px/1.6 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+    .source-location { font-size: 12px; color: var(--muted); margin: 15px 0; overflow-wrap: anywhere; }
+    #source-path, #source-lines { display: block; }
+    #source-lines { margin-top: 4px; font-weight: 600; }
+    .vscode-action { display: inline-block; color: var(--accent); background: #f4f8ff; border: 1px solid #cbdbfa; text-decoration: none; padding: 7px 11px; border-radius: 7px; font-size: 12px; }
+    .detail-grid { font-size: 12px; }
+    .detail-grid dt { color: var(--muted); margin-top: 10px; }
+    .detail-grid dd { margin: 2px 0; overflow-wrap: anywhere; }
+    .description-block { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 24px; }
+    h3 { font-size: 13px; margin: 0 0 9px; }
+    #detail-description, #semantic-summary-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; margin: 0; font-size: 13px; }
+    .missing-description { color: var(--muted); font-size: 12px !important; }
+    .semantic-summary { margin-top: 22px; padding: 16px; border: 1px solid #d4e3fc; border-radius: 10px; background: #f5f9ff; }
+    .semantic-summary h3 { color: #2457a5; }
+    .code-viewer { margin-top: 24px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .code-viewer-header { display: flex; justify-content: space-between; padding: 10px 13px; background: #f3f5f8; border-bottom: 1px solid var(--border); font-size: 12px; }
+    #code-range { color: var(--muted); }
+    .code-scroll { overflow: auto; max-height: 65vh; background: #fafbfc; padding: 12px 0; font: 12px/1.8 ui-monospace, SFMono-Regular, Consolas, monospace; tab-size: 4; }
+    .code-line { display: flex; min-width: max-content; padding-right: 16px; }
+    .line-number { width: 48px; flex: 0 0 48px; text-align: right; padding-right: 12px; color: #8894a7; user-select: none; border-right: 1px solid #e4e7ec; margin-right: 12px; }
     .line-source { white-space: pre; }
-    .source-unavailable { padding: 18px; color: #9bacc3; }
-
-    @media (max-width: 900px) {
-      .topbar { align-items: flex-start; flex-wrap: wrap; }
-      .repo-heading { order: 3; flex-basis: 100%; justify-content: flex-start; text-align: left; }
-      .stat-list { min-width: 0; }
-      .workspace { grid-template-columns: 1fr; }
-      .tree-scroll { height: auto; max-height: 62vh; min-height: 380px; }
-      .detail-panel { height: auto; min-height: 420px; }
-      .node-label { max-width: 58vw; }
+    .source-unavailable { color: var(--muted); padding: 12px; }
+    @media (max-width: 1200px) {
+      .topbar { gap: 12px; padding: 0 16px; }
+      .repository-heading { max-width: 130px; }
+      .canvas-heading { align-items: flex-start; flex-direction: column; padding: 16px; gap: 10px; }
+      .detail-panel { padding: 20px; }
     }
-
-    @media (max-width: 560px) {
-      .stat-list { display: none; }
-      .workspace { padding: 10px; }
-      .panel-header { align-items: flex-start; flex-direction: column; }
-      .tree-scroll { padding: 16px 10px; }
-      .tree-children { margin-left: 13px; padding-left: 17px; }
-      .tree-children > .tree-item::before, .tree-children > .tree-group::before { left: -17px; width: 12px; }
-      .node { grid-template-columns: 30px minmax(100px, auto); }
-      .node-meta { display: none; }
-      .node-label { max-width: 62vw; }
-      .detail-grid { grid-template-columns: 1fr; }
-      .detail-card.wide { grid-column: auto; }
+    @media (max-width: 850px) {
+      .repository-heading { display: none; }
+      .topbar { flex-wrap: wrap; height: 108px; padding: 10px; gap: 8px; }
+      .search-wrap { max-width: none; }
+      .workspace { height: calc(100dvh - 108px); grid-template-columns: minmax(0, 1fr) 300px; }
     }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   </style>
 </head>
 <body>
-  <div class="app-shell">
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true">RA</div>
-        <div>
-          <div class="brand-name">RepoAtlas</div>
-          <div class="brand-label">Knowledge map</div>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">RA</span>RepoAtlas</div>
+    <div class="repository-heading"><strong id="repository-name">Repository</strong><small id="repository-path"></small></div>
+    <div class="search-wrap">
+      <input id="repository-search" type="search" placeholder="Search files, classes, functions..." aria-label="Search repository" aria-controls="search-results" autocomplete="off">
+      <div id="search-results" class="search-results" hidden aria-label="Search results"></div>
+    </div>
+    <div class="toolbar">
+      <button class="control" id="expand-all" title="Expand all branches">Expand all</button>
+      <button class="control" id="collapse-all" title="Collapse file branches">Collapse all</button>
+      <button class="control" id="fit-view" title="Fit the complete visible graph">Fit View</button>
+      <button class="control" id="toggle-details" aria-expanded="true" title="Toggle symbol detail panel">Details</button>
+    </div>
+  </header>
+  <main class="workspace" id="workspace">
+    <section class="canvas-panel" aria-labelledby="map-title">
+      <div class="canvas-heading">
+        <div><h1 id="map-title">Repository Knowledge Canvas</h1><p class="subtle">Repository intelligence for developers and coding agents</p></div>
+        <div class="filters" aria-label="Node type filters">
+          <button class="filter" data-filter="file" aria-pressed="true">Files</button>
+          <button class="filter" data-filter="class" aria-pressed="true">Classes</button>
+          <button class="filter" data-filter="function" aria-pressed="true">Functions</button>
+          <button class="filter" data-filter="method" aria-pressed="true">Methods</button>
         </div>
       </div>
-      <div class="repo-heading">
-        <span aria-hidden="true">/</span>
-        <h1 id="repository-name">Repository</h1>
+      <div id="knowledge-canvas" tabindex="0" aria-label="Knowledge canvas. Drag to pan; use the zoom controls to change scale.">
+        <div id="graph-stage"><svg id="connectors" aria-hidden="true"></svg><div id="knowledge-tree" aria-label="Repository nodes"></div></div>
+        <p class="empty-state" id="empty-state" hidden>No Python files were detected.</p>
       </div>
-      <div class="stat-list" id="stats" aria-label="Repository statistics"></div>
-    </header>
-
-    <main class="workspace">
-      <section class="map-panel" aria-labelledby="map-title">
-        <div class="panel-header">
-          <div class="panel-heading">
-            <p class="eyebrow" id="map-title">Repository map</p>
-            <p class="interaction-hint">Click a node to inspect</p>
-          </div>
-          <div class="toolbar">
-            <button type="button" id="expand-all">Expand all</button>
-            <button type="button" id="collapse-all">Collapse all</button>
-          </div>
+      <div class="canvas-bottom">
+        <p class="subtle" id="canvas-status" role="status"></p>
+        <div class="toolbar">
+          <button class="control" id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+          <span id="zoom-level">100%</span>
+          <button class="control" id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+          <button class="control" id="reset-view" title="Reset to readable scale">Reset</button>
+          <button class="control" id="focus-selected" title="Center selected node">Locate</button>
         </div>
-        <div class="tree-scroll">
-          <ul class="knowledge-tree" id="knowledge-tree" aria-label="Repository knowledge tree"></ul>
-        </div>
+      </div>
+    </section>
+    <aside class="detail-panel" id="detail-panel" aria-label="Symbol detail">
+      <div class="detail-eyebrow">Understand · Locate · Edit</div>
+      <span class="badge" id="detail-type">Repository</span>
+      <h2 id="detail-name">Repository</h2>
+      <p class="detail-signature" id="detail-signature"></p>
+      <div class="source-location" id="source-location"><span id="source-path"></span><span id="source-lines"></span></div>
+      <a class="vscode-action" id="open-vscode" href="#" hidden>Open File in VS Code</a>
+      <dl class="detail-grid" id="detail-grid"></dl>
+      <section class="description-block"><h3>Description</h3><p id="detail-description"></p></section>
+      <section class="semantic-summary" id="semantic-summary" hidden><h3>AI Summary</h3><p id="semantic-summary-text"></p></section>
+      <section class="code-viewer" id="code-viewer" hidden>
+        <div class="code-viewer-header"><strong>Source Code</strong><span id="code-range"></span></div>
+        <div class="code-scroll" id="source-code" tabindex="0" aria-label="Source code"></div>
       </section>
-
-      <aside class="detail-panel" id="detail-panel" aria-live="polite">
-        <span class="detail-type" id="detail-type">Repository</span>
-        <h2 id="detail-name">Repository</h2>
-        <p class="detail-signature" id="detail-signature"></p>
-        <div class="source-location" id="source-location" hidden>
-          <span id="source-path"></span>
-          <span aria-hidden="true">·</span>
-          <span id="source-lines">L1</span>
-        </div>
-        <div class="detail-actions">
-          <a class="vscode-action" id="open-vscode" href="#" hidden>Open File in VS Code</a>
-        </div>
-        <dl class="detail-grid" id="detail-grid"></dl>
-        <div class="description-block">
-          <h3>Description</h3>
-          <p id="detail-description">Select a node to inspect its details.</p>
-        </div>
-        <section class="semantic-summary" id="semantic-summary" hidden aria-labelledby="semantic-summary-title">
-          <h3 id="semantic-summary-title">AI Summary</h3>
-          <p id="semantic-summary-text"></p>
-        </section>
-        <section class="code-viewer" id="code-viewer" hidden aria-labelledby="code-viewer-title">
-          <div class="code-viewer-header">
-            <span id="code-viewer-title">Source code</span>
-            <span id="code-range"></span>
-          </div>
-          <div class="code-scroll" id="source-code"></div>
-        </section>
-      </aside>
-    </main>
-  </div>
-
+    </aside>
+  </main>
   <script id="repo-data" type="application/json">__REPOSITORY_DATA__</script>
   <script>
+    "use strict";
     const repository = JSON.parse(document.getElementById("repo-data").textContent);
-    const treeElement = document.getElementById("knowledge-tree");
-    const typeLabels = {
-      repository: "Repository",
-      file: "File",
-      class: "Class",
-      method: "Method",
-      function: "Function"
-    };
-    const typeIcons = { repository: "RA", file: "PY", class: "C", method: "M", function: "F" };
-    const sourceFiles = new Map(repository.files.map(file => [file.path, file.source || ""]));
+    const $ = id => document.getElementById(id);
+    const canvas = $("knowledge-canvas"), stage = $("graph-stage"), treeElement = $("knowledge-tree");
+    const svg = $("connectors"), records = [], sourceFiles = new Map(repository.files.map(file => [file.path, file.source || ""]));
+    const enabledTypes = new Set(["file", "class", "function", "method"]);
+    const WIDTH = 224, HEIGHT = 88, LEVEL = 324, GAP = 24;
+    let selected = null, query = "", visible = [], edges = [], bounds = { width: WIDTH, height: HEIGHT };
+    let camera = { x: 30, y: 30, scale: 1 }, drag = null;
+
+    // 仅建立一次节点及父子关系，移动画布时无需重建 DOM。
+    function record(node, parent = null) {
+      const item = { id: records.length, node, parent, children: [], expanded: true, x: 0, y: 0 };
+      records.push(item);
+      if (parent) parent.children.push(item);
+      return item;
+    }
+    const root = record({ type: "repository", name: repository.name, path: repository.root_path, docstring: "" });
+    const packages = new Map();
+    repository.files.forEach(file => {
+      const directory = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : "";
+      let parent = root;
+      if (directory) {
+        if (!packages.has(directory)) {
+          const packageItem = record({ type: "package", name: directory + "/", path: directory }, root);
+          packageItem.expanded = repository.files.length <= 18;
+          packages.set(directory, packageItem);
+        }
+        parent = packages.get(directory);
+      }
+      const fileItem = record(file, parent);
+      fileItem.expanded = repository.files.length <= 8;
+      const classes = new Map();
+      file.classes.forEach(node => classes.set(node.name, record(node, fileItem)));
+      file.methods.forEach(node => record(node, classes.get(node.class_name) || fileItem));
+      file.functions.forEach(node => record(node, fileItem));
+    });
 
     function lineRange(node) {
       if (node.start_line == null) return "";
-      if (node.start_line === node.end_line) return `L${node.start_line}`;
-      return `L${node.start_line}–L${node.end_line}`;
+      return node.start_line === node.end_line ? "L" + node.start_line : "L" + node.start_line + "–L" + node.end_line;
     }
-
-    function openInVSCode(uri) {
-      if (!uri) return;
-      try {
-        const link = document.createElement("a");
-        link.href = uri;
-        link.style.display = "none";
-        document.body.append(link);
-        link.click();
-        link.remove();
-      } catch (error) {
-        // The external protocol handoff is optional; keep the map usable on failure.
-      }
+    function isEnabled(item) {
+      return ["repository", "package"].includes(item.node.type) || enabledTypes.has(item.node.type);
     }
-
-    function descriptor(node, children = [], expanded = false) {
-      return { kind: "node", node, children, expanded };
+    function matches(item) {
+      return (item.node.name + " " + (item.node.signature || "") + " " + (item.node.path || "")).toLowerCase().includes(query);
     }
-
-    function group(label, children) {
-      return { kind: "group", label, children };
-    }
-
-    function fileDescriptor(file, index) {
-      const classNames = new Set(file.classes.map(item => item.name));
-      const classes = file.classes.map(item => descriptor(
-        item,
-        file.methods.filter(method => method.class_name === item.name).map(method => descriptor(method)),
-        index === 0
-      ));
-      const functions = file.functions.map(item => descriptor(item));
-      const unmatchedMethods = file.methods
-        .filter(item => !classNames.has(item.class_name))
-        .map(item => descriptor(item));
-      const children = [];
-      if (classes.length) children.push(group("Classes", classes));
-      if (functions.length) children.push(group("Functions", functions));
-      if (unmatchedMethods.length) children.push(group("Methods", unmatchedMethods));
-      return descriptor(file, children, index === 0);
-    }
-
-    function repositoryDescriptor() {
-      const root = {
-        type: "repository",
-        name: repository.name,
-        path: repository.root_path,
-        docstring: "Repository knowledge map generated by RepoAtlas."
-      };
-      return descriptor(root, repository.files.map(fileDescriptor), true);
-    }
-
-    function createGroup(item) {
-      const listItem = document.createElement("li");
-      listItem.className = "tree-group";
-      const label = document.createElement("p");
-      label.className = "group-label";
-      label.textContent = item.label;
-      listItem.append(label, createChildren(item.children));
-      return listItem;
-    }
-
-    function createChildren(items) {
-      const list = document.createElement("ul");
-      list.className = "tree-children";
-      items.forEach(item => list.append(item.kind === "group" ? createGroup(item) : createNode(item)));
-      return list;
-    }
-
     function createNode(item) {
-      const listItem = document.createElement("li");
-      listItem.className = "tree-item";
-      const row = document.createElement("div");
-      row.className = "node-row";
-
-      let childrenElement = null;
-      if (item.children.length) {
-        const toggle = document.createElement("button");
-        toggle.type = "button";
-        toggle.className = "toggle";
-        toggle.textContent = "›";
-        toggle.setAttribute("aria-label", `Toggle ${item.node.name}`);
-        toggle.setAttribute("aria-expanded", String(item.expanded));
-        toggle.addEventListener("click", () => {
-          const expanded = toggle.getAttribute("aria-expanded") === "true";
-          toggle.setAttribute("aria-expanded", String(!expanded));
-          childrenElement.hidden = expanded;
-        });
-        row.append(toggle);
-      } else {
-        const spacer = document.createElement("span");
-        spacer.className = "toggle-spacer";
-        row.append(spacer);
-      }
-
+      const card = document.createElement("div");
+      card.className = "node-card"; card.dataset.type = item.node.type;
       const button = document.createElement("button");
-      button.type = "button";
-      button.className = "node";
-      button.dataset.type = item.node.type;
-      button.innerHTML = `<span class="node-icon">${typeIcons[item.node.type]}</span>`;
-
-      const label = document.createElement("span");
-      label.className = "node-label";
-      label.textContent = item.node.signature || item.node.path || item.node.name;
-      const meta = document.createElement("span");
-      meta.className = "node-meta";
-      meta.textContent = lineRange(item.node) || typeLabels[item.node.type];
-      button.append(label, meta);
-      button.addEventListener("click", () => selectNode(item.node, button));
-      row.append(button);
-      listItem.append(row);
-
+      button.className = "node"; button.dataset.type = item.node.type;
+      button.title = item.node.signature || item.node.path || item.node.name;
+      const badge = document.createElement("span"); badge.className = "badge"; badge.textContent = item.node.type;
+      const label = document.createElement("span"); label.className = "node-label"; label.textContent = item.node.signature || item.node.name;
+      const meta = document.createElement("span"); meta.className = "node-meta";
+      meta.textContent = lineRange(item.node) || item.children.length + (item.node.type === "repository" ? " branches" : " files");
+      if (item.node.type === "file") meta.textContent = (item.node.classes.length + item.node.methods.length + item.node.functions.length) + " symbols";
+      button.append(badge, label, meta); card.append(button);
+      button.addEventListener("click", () => selectNode(item));
       if (item.children.length) {
-        childrenElement = createChildren(item.children);
-        childrenElement.hidden = !item.expanded;
-        listItem.append(childrenElement);
+        const toggle = document.createElement("button"); toggle.className = "branch-toggle";
+        toggle.title = "Expand or collapse " + item.node.name; toggle.setAttribute("aria-label", toggle.title);
+        toggle.addEventListener("click", () => { item.expanded = !item.expanded; layout(); });
+        card.append(toggle); item.toggle = toggle;
       }
-      return listItem;
+      item.element = card; item.button = button; treeElement.append(card);
     }
+    records.forEach(createNode);
 
-    function detailCard(label, value, wide = false) {
-      const wrapper = document.createElement("div");
-      wrapper.className = `detail-card${wide ? " wide" : ""}`;
-      const term = document.createElement("dt");
-      term.textContent = label;
-      const description = document.createElement("dd");
-      const code = document.createElement("code");
-      code.textContent = value;
-      description.append(code);
-      wrapper.append(term, description);
-      return wrapper;
-    }
-
-    function highlightAncestry(button) {
-      document.querySelectorAll(".node.selected, .node.ancestor").forEach(item => {
-        item.classList.remove("selected", "ancestor");
+    // 子树高度决定纵向空间，层级决定横向列；隐藏类型时保留其可见后代。
+    function layout() {
+      visible = []; edges = [];
+      const children = new Map(records.map(item => [item, []]));
+      function collect(item, parent) {
+        const shown = isEnabled(item);
+        if (shown) { visible.push(item); if (parent) children.get(parent).push(item); }
+        if (item.expanded || !shown) item.children.forEach(child => collect(child, shown ? item : parent));
+      }
+      collect(root, null);
+      const visibleSet = new Set(visible);
+      records.forEach(item => {
+        item.element.hidden = !visibleSet.has(item);
+        if (item.toggle) { item.toggle.textContent = item.expanded ? "−" : "+"; item.toggle.setAttribute("aria-expanded", String(item.expanded)); }
       });
-      document.querySelectorAll(".tree-item.active-path").forEach(item => item.classList.remove("active-path"));
-      if (!button) return;
-
-      button.classList.add("selected");
-      let branch = button.closest(".tree-item");
-      while (branch) {
-        branch.classList.add("active-path");
-        const branchNode = branch.querySelector(":scope > .node-row > .node");
-        if (branchNode && branchNode !== button) branchNode.classList.add("ancestor");
-        branch = branch.parentElement.closest(".tree-item");
+      let maxX = 0;
+      function place(item, depth, top) {
+        const descendants = children.get(item);
+        let cursor = top;
+        descendants.forEach(child => {
+          const height = place(child, depth + 1, cursor);
+          edges.push({ parent: item, child }); cursor += height + GAP;
+        });
+        const height = Math.max(HEIGHT, cursor - top - (descendants.length ? GAP : 0));
+        item.x = depth * LEVEL; item.y = top + (height - HEIGHT) / 2;
+        item.element.style.transform = "translate(" + item.x + "px," + item.y + "px)";
+        maxX = Math.max(maxX, item.x + WIDTH);
+        return height;
       }
-    }
-
-    function renderSource(node) {
-      const viewer = document.getElementById("code-viewer");
-      const code = document.getElementById("source-code");
-      const source = node.path ? sourceFiles.get(node.path) : null;
-      viewer.hidden = !node.path;
-      code.replaceChildren();
-      document.getElementById("code-range").textContent = lineRange(node);
-      if (!node.path) return;
-
-      if (!source) {
-        const unavailable = document.createElement("div");
-        unavailable.className = "source-unavailable";
-        unavailable.textContent = "Source unavailable.";
-        code.append(unavailable);
-        return;
-      }
-
-      const startLine = node.start_line || 0;
-      const endLine = node.end_line || startLine;
+      bounds = { height: place(root, 0, 0), width: maxX };
+      stage.style.width = bounds.width + "px"; stage.style.height = bounds.height + "px";
+      svg.setAttribute("width", bounds.width); svg.setAttribute("height", bounds.height);
       const fragment = document.createDocumentFragment();
-      source.replace(/\r\n/g, "\n").split("\n").forEach((text, index) => {
-        const lineNumber = index + 1;
-        const row = document.createElement("div");
-        row.className = "code-line";
-        if (lineNumber >= startLine && lineNumber <= endLine) row.classList.add("active");
-        const number = document.createElement("span");
-        number.className = "line-number";
-        number.textContent = String(lineNumber);
-        const sourceText = document.createElement("span");
-        sourceText.className = "line-source";
-        sourceText.textContent = text || " ";
-        row.append(number, sourceText);
-        fragment.append(row);
+      edges.forEach(edge => {
+        const x = edge.parent.x + WIDTH, y = edge.parent.y + HEIGHT / 2;
+        const endX = edge.child.x, endY = edge.child.y + HEIGHT / 2;
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", "M" + x + "," + y + " C" + (x + 50) + "," + y + " " + (endX - 50) + "," + endY + " " + endX + "," + endY);
+        path.setAttribute("class", "connector"); edge.element = path; fragment.append(path);
       });
-      code.append(fragment);
-      const activeLine = code.querySelector(".code-line.active");
-      if (activeLine) activeLine.scrollIntoView({ block: "center" });
+      svg.replaceChildren(fragment);
+      highlightAncestry();
+      $("canvas-status").textContent = visible.length + " visible nodes · Drag to pan · Scroll to zoom";
     }
-
-    function selectNode(node, button) {
-      highlightAncestry(button);
-
-      document.getElementById("detail-type").textContent = typeLabels[node.type];
-      document.getElementById("detail-name").textContent = node.name;
-      const signature = document.getElementById("detail-signature");
-      signature.textContent = node.signature || "";
-      signature.hidden = !node.signature;
-
-      const sourceLocation = document.getElementById("source-location");
-      const sourceLines = document.getElementById("source-lines");
-      sourceLocation.hidden = !node.path;
-      document.getElementById("source-path").textContent = node.path || "";
-      sourceLines.textContent = lineRange(node);
-
-      const vscodeAction = document.getElementById("open-vscode");
-      vscodeAction.hidden = node.type !== "file" || !node.vscode_uri;
-      vscodeAction.href = node.vscode_uri || "#";
-
-      const grid = document.getElementById("detail-grid");
-      grid.replaceChildren();
-      if (node.type === "repository") grid.append(detailCard("Root path", node.path, true));
-      if (node.class_name) grid.append(detailCard("Class", node.class_name));
-      if (Array.isArray(node.parameters)) {
-        grid.append(detailCard("Parameters", node.parameters.length ? node.parameters.join(", ") : "None", true));
+    function highlightAncestry() {
+      const ancestry = new Set();
+      for (let item = selected; item; item = item.parent) ancestry.add(item);
+      records.forEach(item => {
+        item.button.classList.toggle("selected", item === selected);
+        item.button.classList.toggle("ancestor", item !== selected && ancestry.has(item));
+        item.button.classList.toggle("match", Boolean(query) && matches(item));
+        item.button.classList.toggle("dimmed", Boolean(query) && !matches(item));
+        item.button.setAttribute("aria-pressed", String(item === selected));
+      });
+      edges.forEach(edge => edge.element.classList.toggle("active-path", ancestry.has(edge.child) && ancestry.has(edge.parent)));
+    }
+    function renderSource(node) {
+      const viewer = $("code-viewer"), code = $("source-code"), source = sourceFiles.get(node.path);
+      viewer.hidden = !["file", "class", "function", "method"].includes(node.type);
+      code.replaceChildren(); $("code-range").textContent = lineRange(node);
+      if (viewer.hidden) return;
+      if (!source) { const message = document.createElement("div"); message.className = "source-unavailable"; message.textContent = "Source unavailable."; code.append(message); return; }
+      const lines = source.replace(/\r\n/g, "\n").split("\n");
+      if (lines[lines.length - 1] === "") lines.pop();
+      const start = node.type === "file" ? 1 : Math.max(1, node.start_line || 1);
+      const end = node.type === "file" ? lines.length : Math.min(lines.length, node.end_line || start);
+      const fragment = document.createDocumentFragment();
+      for (let index = start - 1; index < end; index++) {
+        const row = document.createElement("div"); row.className = "code-line";
+        const number = document.createElement("span"); number.className = "line-number"; number.textContent = index + 1;
+        const text = document.createElement("span"); text.className = "line-source"; text.textContent = lines[index] || " ";
+        row.append(number, text); fragment.append(row);
       }
-      document.getElementById("detail-description").textContent = node.docstring || "No description available.";
-      const semanticSummary = document.getElementById("semantic-summary");
-      const semanticSummaryText = document.getElementById("semantic-summary-text");
+      code.append(fragment); code.scrollTop = 0; code.scrollLeft = 0;
+    }
+    function selectNode(item) {
+      selected = item; highlightAncestry();
+      const node = (item || root).node;
+      $("detail-name").textContent = node.name; $("detail-type").textContent = node.type;
+      $("detail-signature").textContent = node.signature || ""; $("detail-signature").hidden = !node.signature;
+      $("source-path").textContent = node.path || ""; $("source-lines").textContent = lineRange(node);
+      const action = $("open-vscode"); action.hidden = node.type !== "file" || !node.vscode_uri;
+      if (action.hidden) action.removeAttribute("href"); else action.href = node.vscode_uri;
+      const grid = $("detail-grid"); grid.replaceChildren();
+      if (node.parameters) {
+        const term = document.createElement("dt"); term.textContent = "Parameters";
+        const value = document.createElement("dd"); value.textContent = node.parameters.join(", ") || "None"; grid.append(term, value);
+      }
+      const description = node.type === "file" ? node.module_docstring : node.docstring;
+      $("detail-description").textContent = description || "No source description.";
+      $("detail-description").classList.toggle("missing-description", !description);
+      const semanticSummary = $("semantic-summary");
       semanticSummary.hidden = !node.semantic_summary;
-      semanticSummaryText.textContent = node.semantic_summary || "";
+      $("semantic-summary-text").textContent = node.semantic_summary || "";
       renderSource(node);
     }
-
-    function setAllBranches(expanded) {
-      document.querySelectorAll(".toggle").forEach(toggle => {
-        toggle.setAttribute("aria-expanded", String(expanded));
-        const row = toggle.closest(".node-row");
-        const children = row.nextElementSibling;
-        if (children) children.hidden = !expanded;
+    function applyCamera() {
+      stage.style.transform = "translate(" + camera.x + "px," + camera.y + "px) scale(" + camera.scale + ")";
+      $("zoom-level").textContent = Math.round(camera.scale * 100) + "%";
+    }
+    function fitView() {
+      camera.scale = Math.min(1, (canvas.clientWidth - 80) / bounds.width, (canvas.clientHeight - 110) / bounds.height);
+      camera.scale = Math.max(.025, camera.scale);
+      camera.x = (canvas.clientWidth - bounds.width * camera.scale) / 2;
+      camera.y = (canvas.clientHeight - bounds.height * camera.scale) / 2 - 15; applyCamera();
+    }
+    function focusNode(item) {
+      if (!item) return;
+      enabledTypes.add(item.node.type);
+      document.querySelectorAll("[data-filter]").forEach(button => button.setAttribute("aria-pressed", String(enabledTypes.has(button.dataset.filter))));
+      for (let parent = item.parent; parent; parent = parent.parent) parent.expanded = true;
+      layout();
+      camera.scale = Math.max(.8, camera.scale);
+      camera.x = canvas.clientWidth / 2 - (item.x + WIDTH / 2) * camera.scale;
+      camera.y = canvas.clientHeight / 2 - (item.y + HEIGHT / 2) * camera.scale; applyCamera();
+    }
+    function zoom(factor, x = canvas.clientWidth / 2, y = canvas.clientHeight / 2) {
+      const scale = Math.min(2, Math.max(.025, camera.scale * factor));
+      camera.x = x - (x - camera.x) * scale / camera.scale;
+      camera.y = y - (y - camera.y) * scale / camera.scale; camera.scale = scale; applyCamera();
+    }
+    function search() {
+      query = $("repository-search").value.trim().toLowerCase();
+      const results = $("search-results"); results.replaceChildren(); results.hidden = !query;
+      if (!query) { highlightAncestry(); return; }
+      const matchesList = records.filter(item => matches(item));
+      matchesList.forEach(item => { for (let parent = item.parent; parent; parent = parent.parent) parent.expanded = true; });
+      layout();
+      matchesList.slice(0, 60).forEach(item => {
+        const button = document.createElement("button"); button.className = "search-result";
+        const label = document.createElement("span"); label.textContent = item.node.signature || item.node.name;
+        const meta = document.createElement("small"); meta.textContent = item.node.type + " · " + (item.node.path || "");
+        button.append(label, meta);
+        button.addEventListener("click", () => { selectNode(item); focusNode(item); results.hidden = true; item.button.focus({ preventScroll: true }); });
+        results.append(button);
       });
+      if (!matchesList.length) results.textContent = "No matching nodes.";
+      $("canvas-status").textContent = matchesList.length + " matches" + (matchesList.length > 60 ? " · First 60 listed; narrow your search" : "");
     }
-
-    const functionCount = repository.files.reduce((total, file) => total + file.functions.length, 0);
-    const classCount = repository.files.reduce((total, file) => total + file.classes.length, 0);
-    const symbolCount = repository.files.reduce(
-      (total, file) => total + file.classes.length + file.functions.length + file.methods.length,
-      0
-    );
-    const stats = [
-      `${repository.files.length} files`,
-      `${classCount} classes`,
-      `${functionCount} functions`,
-      `${symbolCount} symbols`
-    ];
-    document.getElementById("stats").replaceChildren(...stats.map(text => {
-      const item = document.createElement("span");
-      item.className = "stat";
-      item.textContent = text;
-      return item;
-    }));
-    document.getElementById("repository-name").textContent = repository.name;
-
-    treeElement.append(createNode(repositoryDescriptor()));
-    if (!repository.files.length) {
-      const empty = document.createElement("li");
-      empty.className = "empty-state";
-      empty.textContent = "No Python files were detected.";
-      treeElement.append(empty);
+    function setAllBranches(expanded) {
+      records.forEach(item => { item.expanded = expanded || ["repository", "package"].includes(item.node.type); });
+      layout(); fitView();
     }
-
-    document.getElementById("expand-all").addEventListener("click", () => setAllBranches(true));
-    document.getElementById("collapse-all").addEventListener("click", () => setAllBranches(false));
-    document.getElementById("open-vscode").addEventListener("click", event => {
-      event.preventDefault();
-      openInVSCode(event.currentTarget.href);
+    $("repository-name").textContent = repository.name; $("repository-path").textContent = repository.root_path;
+    $("repository-path").title = repository.root_path;
+    $("empty-state").hidden = repository.files.length > 0;
+    $("expand-all").addEventListener("click", () => setAllBranches(true));
+    $("collapse-all").addEventListener("click", () => setAllBranches(false));
+    $("fit-view").addEventListener("click", fitView);
+    $("reset-view").addEventListener("click", () => { camera.scale = 1; focusNode(selected || root); });
+    $("focus-selected").addEventListener("click", () => focusNode(selected || root));
+    $("zoom-in").addEventListener("click", () => zoom(1.2));
+    $("zoom-out").addEventListener("click", () => zoom(1 / 1.2));
+    $("toggle-details").addEventListener("click", event => {
+      const collapsed = $("workspace").classList.toggle("details-collapsed");
+      event.currentTarget.setAttribute("aria-expanded", String(!collapsed));
     });
-    selectNode(repositoryDescriptor().node, document.querySelector('.node[data-type="repository"]'));
+    document.querySelectorAll("[data-filter]").forEach(button => button.addEventListener("click", () => {
+      const type = button.dataset.filter;
+      if (enabledTypes.has(type)) enabledTypes.delete(type); else enabledTypes.add(type);
+      button.setAttribute("aria-pressed", String(enabledTypes.has(type))); layout();
+    }));
+    let searchTimer;
+    $("repository-search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(search, 120); });
+    $("repository-search").addEventListener("keydown", event => { if (event.key === "ArrowDown") { event.preventDefault(); $("search-results").querySelector("button")?.focus(); } });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") { clearTimeout(searchTimer); $("repository-search").value = ""; query = ""; $("search-results").hidden = true; selectNode(null); }
+    });
+    document.addEventListener("click", event => { if (!event.target.closest(".search-wrap")) $("search-results").hidden = true; });
+    canvas.addEventListener("wheel", event => {
+      event.preventDefault(); const rect = canvas.getBoundingClientRect();
+      zoom(Math.exp(-event.deltaY * .0015), event.clientX - rect.left, event.clientY - rect.top);
+    }, { passive: false });
+    canvas.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || event.target.closest("button")) return;
+      drag = { x: event.clientX, y: event.clientY, cameraX: camera.x, cameraY: camera.y };
+      canvas.setPointerCapture(event.pointerId); canvas.classList.add("panning");
+    });
+    canvas.addEventListener("pointermove", event => {
+      if (!drag) return;
+      camera.x = drag.cameraX + event.clientX - drag.x; camera.y = drag.cameraY + event.clientY - drag.y; applyCamera();
+    });
+    function endPan() { drag = null; canvas.classList.remove("panning"); }
+    canvas.addEventListener("pointerup", endPan); canvas.addEventListener("pointercancel", endPan);
+    canvas.addEventListener("keydown", event => {
+      if (event.target !== canvas) return;
+      const delta = { ArrowLeft: [50, 0], ArrowRight: [-50, 0], ArrowUp: [0, 50], ArrowDown: [0, -50] }[event.key];
+      if (delta) { event.preventDefault(); camera.x += delta[0]; camera.y += delta[1]; applyCamera(); }
+    });
+    // 外部协议仅对文件开放；浏览器拒绝时页面仍可继续使用。
+    $("open-vscode").addEventListener("click", event => {
+      event.preventDefault();
+      if (!selected || selected.node.type !== "file") return;
+      try { const link = document.createElement("a"); link.href = selected.node.vscode_uri; document.body.append(link); link.click(); link.remove(); } catch (_) { /* Optional editor handoff. */ }
+    });
+    new ResizeObserver(() => applyCamera()).observe(canvas);
+    layout(); selectNode(root);
+    requestAnimationFrame(() => { if (bounds.height < canvas.clientHeight * 2) fitView(); else { camera.scale = .8; camera.x = 35; camera.y = 25; applyCamera(); } });
   </script>
 </body>
 </html>

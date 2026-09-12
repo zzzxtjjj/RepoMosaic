@@ -262,11 +262,11 @@ def test_map_styles_highlight_connectors_and_selected_ancestry(tmp_path):
     paths = render_visual_map(make_repository(), tmp_path / "output")
     html = paths["html"].read_text(encoding="utf-8")
 
-    assert "--connector: #6687b8;" in html
+    assert "--connector: #475467;" in html
     assert "--connector-width: 2px;" in html
     assert "--connector-path-width: 3px;" in html
     assert ".node.ancestor" in html
-    assert ".tree-item.active-path" in html
+    assert ".connector.active-path" in html
     assert "function highlightAncestry" in html
     assert 'id="source-lines"' in html
 
@@ -279,5 +279,60 @@ def test_empty_repository_html_keeps_repository_root(tmp_path):
 
     assert '"type": "repository"' in html
     assert '"name": "empty"' in html
-    assert "treeElement.append(createNode(repositoryDescriptor()))" in html
+    assert 'record({ type: "repository"' in html
     assert "No Python files were detected." in html
+
+
+def test_file_source_documentation_is_separate_from_ai_summary(tmp_path):
+    repository = make_repository()
+    repository.files[0].module_docstring = "Original documentation.\n\n保持原始语言。"
+    paths = render_visual_map(repository, tmp_path, make_summaries(), "en")
+    data = json.loads(paths["json"].read_text(encoding="utf-8"))
+    file_data = data["files"][0]
+    assert file_data["module_docstring"] == "Original documentation.\n\n保持原始语言。"
+    assert file_data["docstring"] == file_data["module_docstring"]
+    assert file_data["semantic_summary"] == "Defines the robot model and factory."
+    html = paths["html"].read_text(encoding="utf-8")
+    assert 'node.type === "file" ? node.module_docstring : node.docstring' in html
+    assert html.index('id="detail-description"') < html.index('id="semantic-summary"')
+    assert html.index('id="semantic-summary"') < html.index('id="code-viewer"')
+
+
+def test_missing_source_description_is_not_invented():
+    repository = make_repository()
+    repository.files[0].functions[0].docstring = ""
+    file_data = repository_to_dict(repository)["files"][0]
+    assert file_data["module_docstring"] == ""
+    assert file_data["docstring"] == ""
+    assert file_data["functions"][0]["docstring"] == ""
+    assert file_data["semantic_summary"] is None
+
+
+def test_full_source_and_symbol_ranges_are_preserved(tmp_path):
+    repository = make_repository()
+    repository.root_path = str(tmp_path)
+    source_path = tmp_path / "repoatlas" / "robot.py"
+    source_path.parent.mkdir()
+    source = "\n".join("    # source line " + str(n) for n in range(1, 45)) + "\n"
+    source_path.write_text(source, encoding="utf-8")
+    file_data = repository_to_dict(repository)["files"][0]
+    assert file_data["source"] == source
+    assert file_data["start_line"] == 1
+    assert file_data["end_line"] == 44
+    assert file_data["methods"][0]["start_line"] == 10
+    assert file_data["methods"][0]["end_line"] == 18
+
+
+def test_light_canvas_contains_offline_navigation_controls(tmp_path):
+    html = render_visual_map(make_repository(), tmp_path)["html"].read_text(encoding="utf-8")
+    for hook in ("repository-search", "search-results", "knowledge-canvas", "graph-stage",
+                 "connectors", "fit-view", "reset-view", "zoom-in", "zoom-out",
+                 "focus-selected", "toggle-details"):
+        assert 'id="' + hook + '"' in html
+    for node_type in ("file", "class", "function", "method"):
+        assert 'data-filter="' + node_type + '"' in html
+    assert "color-scheme: light" in html
+    assert "No source description." in html
+    assert '<section class="semantic-summary" id="semantic-summary" hidden>' in html
+    assert "<script src=" not in html
+    assert "<link " not in html

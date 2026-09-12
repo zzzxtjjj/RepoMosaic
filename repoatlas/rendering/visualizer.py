@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 from repoatlas.core.parser import build_signature
 from repoatlas.core.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
-from repoatlas.rendering.renderer import DEFAULT_DESCRIPTION, render_structure_markdown
+from repoatlas.rendering.renderer import render_structure_markdown
 from repoatlas.semantic.index import build_summary_index, make_summary_key
 from repoatlas.semantic.models import SemanticSummary
 
@@ -15,10 +15,9 @@ from repoatlas.semantic.models import SemanticSummary
 TEMPLATE_PATH = Path(__file__).parent / "templates" / "map.html"
 
 
-def _description(docstring: str) -> str:
-    """返回清理后的说明，缺失时使用明确的占位文本。"""
-    cleaned = " ".join(docstring.split())
-    return cleaned or DEFAULT_DESCRIPTION
+def _source_description(docstring: str) -> str:
+    """保留开发者原始说明内容，缺失时交由前端低调展示。"""
+    return docstring.strip()
 
 
 def build_vscode_uri(
@@ -92,7 +91,7 @@ def _serialize_function(
         "end_line": function_info.end_line,
         "parameters": function_info.parameters,
         "class_name": function_info.class_name,
-        "docstring": _description(function_info.docstring),
+        "docstring": _source_description(function_info.docstring),
         "semantic_summary": _lookup_summary(
             summary_index,
             target_type=symbol_type,
@@ -118,7 +117,7 @@ def _serialize_class(
         "path": file_path,
         "start_line": class_info.start_line,
         "end_line": class_info.end_line,
-        "docstring": _description(class_info.docstring),
+        "docstring": _source_description(class_info.docstring),
         "semantic_summary": _lookup_summary(
             summary_index,
             target_type="class",
@@ -138,14 +137,18 @@ def _serialize_file(
     language: str,
 ) -> dict[str, object]:
     """完整序列化文件及其全部 classes、functions 和 methods。"""
+    source = _read_source(root_path, file_info.path)
+    module_docstring = _source_description(file_info.module_docstring)
+    source_line_count = max(1, len(source.splitlines()))
     return {
         "type": "file",
         "name": Path(file_info.path).name,
         "path": file_info.path.replace("\\", "/"),
         "start_line": 1,
-        "end_line": 1,
-        "docstring": DEFAULT_DESCRIPTION,
-        "source": _read_source(root_path, file_info.path),
+        "end_line": source_line_count,
+        "module_docstring": module_docstring,
+        "docstring": module_docstring,
+        "source": source,
         "vscode_uri": build_vscode_uri(root_path, file_info.path),
         "semantic_summary": _lookup_summary(
             summary_index,
