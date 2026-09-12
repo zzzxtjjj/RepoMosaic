@@ -264,13 +264,44 @@ def test_map_styles_highlight_connectors_and_selected_ancestry(tmp_path):
     paths = render_visual_map(make_repository(), tmp_path / "output")
     html = paths["html"].read_text(encoding="utf-8")
 
-    assert "--connector: #475467;" in html
-    assert "--connector-width: 2px;" in html
-    assert "--connector-path-width: 3px;" in html
+    assert "--connector: #4f74ad;" in html
+    assert "--connector-trunk: #315f9e;" in html
+    assert "--connector-symbol: #6574b8;" in html
+    assert "--connector-active: #1d4ed8;" in html
+    assert "--connector-width: 2.5px;" in html
+    assert "--connector-trunk-width: 3px;" in html
+    assert "--connector-path-width: 4px;" in html
+    assert 'path.dataset.targetType = edge.child.node.type' in html
     assert ".node.ancestor" in html
     assert ".connector.active-path" in html
     assert "function highlightAncestry" in html
     assert 'id="source-lines"' in html
+
+
+def test_fit_view_keeps_small_graph_readable_and_large_graph_fittable(tmp_path):
+    html = render_visual_map(make_repository(), tmp_path / "output")["html"].read_text(
+        encoding="utf-8"
+    )
+
+    assert "const FIT_MAX_SCALE = 1.12" in html
+    assert "DEFAULT_MIN_SCALE = .82" in html
+    assert "READABLE_NODE_LIMIT = 80" in html
+    assert "FIT_PADDING_X = 36" in html
+    assert "FIT_PADDING_Y = 48" in html
+    assert "return Math.min(FIT_MAX_SCALE" in html
+    assert "centerView(fittedScale())" in html
+    assert "visible.length <= READABLE_NODE_LIMIT" in html
+    assert "Math.max(DEFAULT_MIN_SCALE, scale)" in html
+    assert '$("reset-view").addEventListener("click", resetView)' in html
+    assert "requestAnimationFrame(resetView)" in html
+
+    # sample_repo 形态在常见左侧视口中应接近正常阅读比例。
+    small_fit = min(1.12, (920 - 36) / 1076, (650 - 48) / 648)
+    assert 0.8 <= small_fit <= 1.12
+
+    # 大图仍可低于 readable maximum 缩小，保证完整图能 Fit View。
+    large_fit = min(1.12, (920 - 36) / 4000, (650 - 48) / 5000)
+    assert large_fit < 0.5
 
 
 def test_empty_repository_html_keeps_repository_root(tmp_path):

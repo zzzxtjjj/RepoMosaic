@@ -9,7 +9,10 @@
       color-scheme: light;
       --page: #f7f8fa; --panel: #ffffff; --text: #172033; --muted: #667085;
       --border: #e4e7ec; --accent: #2563eb; --selected: #eff6ff;
-      --connector: #475467; --connector-width: 2px; --connector-path-width: 3px;
+      --connector: #4f74ad; --connector-trunk: #315f9e;
+      --connector-symbol: #6574b8; --connector-active: #1d4ed8;
+      --connector-width: 2.5px; --connector-trunk-width: 3px;
+      --connector-path-width: 4px;
       font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--text); background: var(--page);
     }
@@ -53,7 +56,9 @@
     #graph-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
     #connectors { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
     .connector { fill: none; stroke: var(--connector); stroke-width: var(--connector-width); vector-effect: non-scaling-stroke; }
-    .connector.active-path { stroke: var(--accent); stroke-width: var(--connector-path-width); }
+    .connector[data-target-type="package"], .connector[data-target-type="file"] { stroke: var(--connector-trunk); stroke-width: var(--connector-trunk-width); }
+    .connector[data-target-type="function"], .connector[data-target-type="method"] { stroke: var(--connector-symbol); }
+    .connector.active-path { stroke: var(--connector-active); stroke-width: var(--connector-path-width); }
     .node-card { position: absolute; width: 224px; height: 88px; }
     .node { width: 100%; height: 100%; text-align: left; border: 1px solid #ced5df; background: white; border-radius: 11px; padding: 11px 15px; box-shadow: 0 2px 4px #17203306; transition: background .15s, border-color .15s; }
     .node:hover { background: #f8fafc; border-color: #8294ad; }
@@ -180,7 +185,9 @@
     const canvas = $("knowledge-canvas"), stage = $("graph-stage"), treeElement = $("knowledge-tree");
     const svg = $("connectors"), records = [], sourceFiles = new Map(repository.files.map(file => [file.path, file.source || ""]));
     const enabledTypes = new Set(["file", "class", "function", "method"]);
-    const WIDTH = 224, HEIGHT = 88, LEVEL = 324, GAP = 24;
+    const WIDTH = 224, HEIGHT = 88, LEVEL = 284, GAP = 24, CONNECTOR_BEND = 30;
+    const FIT_MAX_SCALE = 1.12, DEFAULT_MIN_SCALE = .82, READABLE_NODE_LIMIT = 80;
+    const FIT_PADDING_X = 36, FIT_PADDING_Y = 48;
     let selected = null, query = "", visible = [], edges = [], bounds = { width: WIDTH, height: HEIGHT };
     let camera = { x: 30, y: 30, scale: 1 }, drag = null;
 
@@ -282,8 +289,9 @@
         const x = edge.parent.x + WIDTH, y = edge.parent.y + HEIGHT / 2;
         const endX = edge.child.x, endY = edge.child.y + HEIGHT / 2;
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", "M" + x + "," + y + " C" + (x + 50) + "," + y + " " + (endX - 50) + "," + endY + " " + endX + "," + endY);
+        path.setAttribute("d", "M" + x + "," + y + " C" + (x + CONNECTOR_BEND) + "," + y + " " + (endX - CONNECTOR_BEND) + "," + endY + " " + endX + "," + endY);
         path.setAttribute("class", "connector"); edge.element = path; fragment.append(path);
+        path.dataset.targetType = edge.child.node.type;
       });
       svg.replaceChildren(fragment);
       highlightAncestry();
@@ -345,11 +353,23 @@
       stage.style.transform = "translate(" + camera.x + "px," + camera.y + "px) scale(" + camera.scale + ")";
       $("zoom-level").textContent = Math.round(camera.scale * 100) + "%";
     }
+    function fittedScale() {
+      const availableWidth = Math.max(1, canvas.clientWidth - FIT_PADDING_X);
+      const availableHeight = Math.max(1, canvas.clientHeight - FIT_PADDING_Y);
+      return Math.min(FIT_MAX_SCALE, availableWidth / bounds.width, availableHeight / bounds.height);
+    }
+    function centerView(scale) {
+      camera.scale = scale;
+      camera.x = (canvas.clientWidth - bounds.width * scale) / 2;
+      camera.y = (canvas.clientHeight - bounds.height * scale) / 2; applyCamera();
+    }
     function fitView() {
-      camera.scale = Math.min(1, (canvas.clientWidth - 80) / bounds.width, (canvas.clientHeight - 110) / bounds.height);
-      camera.scale = Math.max(.025, camera.scale);
-      camera.x = (canvas.clientWidth - bounds.width * camera.scale) / 2;
-      camera.y = (canvas.clientHeight - bounds.height * camera.scale) / 2 - 15; applyCamera();
+      centerView(fittedScale());
+    }
+    function resetView() {
+      layout();
+      const scale = fittedScale();
+      centerView(visible.length <= READABLE_NODE_LIMIT ? Math.max(DEFAULT_MIN_SCALE, scale) : scale);
     }
     function focusNode(item) {
       if (!item) return;
@@ -394,7 +414,7 @@
     $("expand-all").addEventListener("click", () => setAllBranches(true));
     $("collapse-all").addEventListener("click", () => setAllBranches(false));
     $("fit-view").addEventListener("click", fitView);
-    $("reset-view").addEventListener("click", () => { camera.scale = 1; focusNode(selected || root); });
+    $("reset-view").addEventListener("click", resetView);
     $("focus-selected").addEventListener("click", () => focusNode(selected || root));
     $("zoom-in").addEventListener("click", () => zoom(1.2));
     $("zoom-out").addEventListener("click", () => zoom(1 / 1.2));
@@ -442,7 +462,7 @@
     });
     new ResizeObserver(() => applyCamera()).observe(canvas);
     layout(); selectNode(root);
-    requestAnimationFrame(() => { if (bounds.height < canvas.clientHeight * 2) fitView(); else { camera.scale = .8; camera.x = 35; camera.y = 25; applyCamera(); } });
+    requestAnimationFrame(resetView);
   </script>
 </body>
 </html>
