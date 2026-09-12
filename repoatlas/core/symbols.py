@@ -31,6 +31,7 @@ class FileInfo:
     functions: list[FunctionInfo]
     classes: list[ClassInfo]
     methods: list[FunctionInfo]
+    module_docstring: str = ""
 
 
 # 保存 RepoAtlas 对整个代码仓库分析后的结构化信息

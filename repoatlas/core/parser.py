@@ -15,6 +15,7 @@ def parse_python_file(file_path: str | Path) -> FileInfo:
     functions: list[FunctionInfo] = []
     classes: list[ClassInfo] = []
     methods: list[FunctionInfo] = []
+    module_docstring = ast.get_docstring(tree) or ""
 
     for node in tree.body:
 
@@ -35,6 +36,7 @@ def parse_python_file(file_path: str | Path) -> FileInfo:
         functions=functions,
         classes=classes,
         methods=methods,
+        module_docstring=module_docstring
     )
 
 
@@ -82,3 +84,31 @@ def extract_class_info(node: ast.ClassDef) -> ClassInfo:
         end_line=node.end_lineno,
         docstring=extract_docstring(node),
     )
+
+
+# 从 Python AST 的函数参数节点中提取完整的参数列表，包括位置参数、*args 和 **kwargs
+def extract_parameters(arguments: ast.arguments) -> list[str]:
+    parameters: list[str] = []
+
+    for argument in arguments.posonlyargs:
+        parameters.append(argument.arg)
+
+    if arguments.posonlyargs:
+        parameters.append("/")
+
+    for argument in arguments.args:
+        parameters.append(argument.arg)
+
+    if arguments.vararg is not None:
+        parameters.append(f"*{arguments.vararg.arg}")
+
+    if arguments.kwonlyargs and arguments.vararg is None:
+        parameters.append("*")
+
+    for argument in arguments.kwonlyargs:
+        parameters.append(argument.arg)
+
+    if arguments.kwarg is not None:
+        parameters.append(f"**{arguments.kwarg.arg}")
+
+    return parameters

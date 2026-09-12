@@ -107,3 +107,42 @@ def test_build_signature():
         static_method,
         is_method=True,
     ) == "calculate(x, y)"
+
+
+# 验证 parser 能提取 Python 文件顶部的模块级 docstring
+def test_parse_python_file_extracts_module_docstring(tmp_path):
+    file_path = tmp_path / "utils.py"
+
+    file_path.write_text(
+        '''
+"""Utility functions used by the sample repository."""
+
+def calculate_distance(start, end):
+    return abs(end - start)
+'''.strip(),
+        encoding="utf-8",
+    )
+
+    file_info = parse_python_file(file_path)
+
+    assert (
+        file_info.module_docstring
+        == "Utility functions used by the sample repository."
+    )
+
+
+# 验证没有模块级 docstring 时，FileInfo 使用空字符串
+def test_parse_python_file_without_module_docstring(tmp_path):
+    file_path = tmp_path / "utils.py"
+
+    file_path.write_text(
+        """
+def calculate_distance(start, end):
+    return abs(end - start)
+""".strip(),
+        encoding="utf-8",
+    )
+
+    file_info = parse_python_file(file_path)
+
+    assert file_info.module_docstring == ""
