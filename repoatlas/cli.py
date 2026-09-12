@@ -8,11 +8,35 @@ from typing import Sequence
 from repoatlas import __version__
 from repoatlas.core.analyzer import analyze_repository
 from repoatlas.rendering.visualizer import render_visual_map
-from repoatlas.semantic.languages import SUPPORTED_LANGUAGES
+from repoatlas.semantic.languages import normalize_language
 from repoatlas.llm.config import LLMConfig
 from repoatlas.llm.factory import create_llm_client
 from repoatlas.semantic.summarizer import summarize_repository
 from repoatlas.llm.base import LLMError
+from repoatlas.project_config import (
+    DEFAULT_LANGUAGE,
+    DEFAULT_PROVIDER,
+    ProjectConfigError,
+    load_project_config,
+    write_project_config,
+)
+
+
+def _print_language_error(error: ValueError) -> None:
+    """在受限 Windows code page 下也用 UTF-8 输出完整语言列表。"""
+    message = f"RepoAtlas error: {error}"
+    encoding = getattr(sys.stderr, "encoding", None) or "utf-8"
+
+    try:
+        message.encode(encoding)
+    except (LookupError, UnicodeEncodeError):
+        buffer = getattr(sys.stderr, "buffer", None)
+        if buffer is not None:
+            buffer.write((message + "\n").encode("utf-8"))
+            buffer.flush()
+            return
+
+    print(message, file=sys.stderr)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -61,9 +85,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--lang",
-        default="en",
-        choices=SUPPORTED_LANGUAGES.keys(),
-        help="Language used for semantic summaries",
+        default=None,
+        help="Summary language code or common name/alias (default: en)",
     )
 
     parser.add_argument(
@@ -75,15 +98,70 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def build_init_parser() -> argparse.ArgumentParser:
+    """Create the parser for ``repoatlas init``."""
+    parser = argparse.ArgumentParser(
+        prog="repoatlas init",
+        description="Create a .repoatlas.toml template in the current directory.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite an existing .repoatlas.toml file.",
+    )
+    return parser
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """分析仓库并生成 Markdown、JSON 和交互式 HTML 地图。"""
-    args = build_parser().parse_args(argv)
+    arguments = list(argv) if argv is not None else sys.argv[1:]
+
+    if arguments and arguments[0] == "init":
+        init_args = build_init_parser().parse_args(arguments[1:])
+        try:
+            config_path = write_project_config(Path.cwd(), force=init_args.force)
+        except (FileExistsError, OSError) as error:
+            print(f"RepoAtlas error: {error}", file=sys.stderr)
+            return 2
+
+        print(f"Created: {config_path}")
+        print("Set REPOATLAS_API_KEY in your environment before using LLM features.")
+        return 0
+
+    args = build_parser().parse_args(arguments)
+
+    try:
+        project_config = load_project_config(Path.cwd())
+    except ProjectConfigError as error:
+        print(f"RepoAtlas error: {error}", file=sys.stderr)
+        return 2
+
+    provider = (
+        args.provider
+        if args.provider is not None
+        else project_config.provider or DEFAULT_PROVIDER
+    )
+    model = args.model if args.model is not None else project_config.model
+    base_url = (
+        args.base_url if args.base_url is not None else project_config.base_url
+    )
+    language = (
+        args.lang
+        if args.lang is not None
+        else project_config.language or DEFAULT_LANGUAGE
+    )
+
+    try:
+        language = normalize_language(language)
+    except ValueError as error:
+        _print_language_error(error)
+        return 2
 
     llm_requested = any(
         [
             args.provider,
-            args.model,
-            args.base_url,
+            model,
+            base_url,
         ]
     )
 
@@ -95,13 +173,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if llm_requested:
         missing = []
 
-        if not args.provider:
+        if not provider:
             missing.append("provider")
 
-        if not args.model:
+        if not model:
             missing.append("model")
    
-        if not args.base_url:
+        if not base_url:
             missing.append("base-url")
 
         if missing:
@@ -114,10 +192,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         api_key = os.getenv("REPOATLAS_API_KEY")
 
         llm_config = LLMConfig(
-            provider=args.provider,
-            model=args.model,
+            provider=provider,
+            model=model,
             api_key=api_key,
-            base_url=args.base_url,
+            base_url=base_url,
         )
 
     llm_client = None
@@ -143,7 +221,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             # 使用已经创建好的 LLM Client，为整个仓库生成语义摘要
             summaries = summarize_repository(
                 repository=repository,
-                language=args.lang,
+                language=language,
                 llm=llm_client,
             )
 
@@ -151,7 +229,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             repository,
             output_dir,
             summaries=summaries,
-            language=args.lang,
+            language=language,
         )
 
     except LLMError as error:

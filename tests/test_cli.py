@@ -1,4 +1,6 @@
+from io import BytesIO, TextIOWrapper
 from pathlib import Path
+import sys
 from repoatlas.llm.base import LLMError
 from repoatlas.cli import build_parser, main
 
@@ -24,7 +26,7 @@ def test_build_parser_defaults():
     assert args.provider is None
     assert args.model is None
     assert args.base_url is None
-    assert args.lang == "en"
+    assert args.lang is None
 
 
 # 验证 CLI 在不启用 LLM 时仍能完成静态仓库分析并生成三个输出文件
@@ -71,7 +73,6 @@ def test_cli_rejects_incomplete_llm_options(capsys):
 
     assert exit_code == 2
     assert "missing LLM options" in captured.err
-    assert "provider" in captured.err
     assert "base-url" in captured.err
 
 
@@ -212,3 +213,321 @@ def hello():
 
     assert exit_code == 1
     assert "RepoAtlas error: LLM request timed out." in captured.err
+
+
+def test_cli_init_creates_config_in_current_directory(
+    tmp_path: Path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["init"]) == 0
+
+    captured = capsys.readouterr()
+    assert (tmp_path / ".repoatlas.toml").exists()
+    assert "Created:" in captured.out
+    assert "REPOATLAS_API_KEY" in captured.out
+
+
+def test_cli_init_refuses_to_overwrite_existing_config(
+    tmp_path: Path, monkeypatch, capsys
+):
+    config_path = tmp_path / ".repoatlas.toml"
+    config_path.write_text("original\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["init"]) == 2
+
+    captured = capsys.readouterr()
+    assert "already exists" in captured.err
+    assert config_path.read_text(encoding="utf-8") == "original\n"
+
+
+def test_cli_uses_config_and_cli_values_take_precedence(
+    tmp_path: Path, monkeypatch
+):
+    repo_dir = tmp_path / "sample_repo"
+    repo_dir.mkdir()
+    (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / ".repoatlas.toml").write_text(
+        """[llm]
+provider = "config-provider"
+model = "config-model"
+base_url = "https://config.example/v1"
+language = "中文"
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    captured_config = None
+    captured_language = None
+
+    def capture_client(config):
+        nonlocal captured_config
+        captured_config = config
+        return FakeLLM()
+
+    def capture_summaries(repository, language, llm):
+        nonlocal captured_language
+        captured_language = language
+        return None
+
+    monkeypatch.setattr("repoatlas.cli.create_llm_client", capture_client)
+    monkeypatch.setattr("repoatlas.cli.summarize_repository", capture_summaries)
+
+    exit_code = main(
+        [
+            str(repo_dir),
+            "--output-dir",
+            str(tmp_path / "output"),
+            "--model",
+            "cli-model",
+            "--lang",
+            "English",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured_config.provider == "config-provider"
+    assert captured_config.model == "cli-model"
+    assert captured_config.base_url == "https://config.example/v1"
+    assert captured_language == "en"
+
+
+def test_cli_normalizes_language_alias_from_config(tmp_path: Path, monkeypatch):
+    repo_dir = tmp_path / "sample_repo"
+    repo_dir.mkdir()
+    (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / ".repoatlas.toml").write_text(
+        "[llm]\nlanguage = \"日本語\"\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    captured_language = None
+
+    def capture_render(repository, output_dir, summaries, language):
+        nonlocal captured_language
+        captured_language = language
+        return {}
+
+    monkeypatch.setattr("repoatlas.cli.render_visual_map", capture_render)
+
+    assert main([str(repo_dir), "--no-llm"]) == 0
+    assert captured_language == "ja"
+
+
+def test_cli_normalizes_canonical_language_unchanged(tmp_path: Path, monkeypatch):
+    repo_dir = tmp_path / "sample_repo"
+    repo_dir.mkdir()
+    (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
+    captured_language = None
+
+    def capture_render(repository, output_dir, summaries, language):
+        nonlocal captured_language
+        captured_language = language
+        return {}
+
+    monkeypatch.setattr("repoatlas.cli.render_visual_map", capture_render)
+
+    assert main([str(repo_dir), "--no-llm", "--lang", "zh-CN"]) == 0
+    assert captured_language == "zh-CN"
+
+
+def test_cli_rejects_unsupported_language_before_llm(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+):
+    repo_dir = tmp_path / "sample_repo"
+    repo_dir.mkdir()
+    (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    def fail_if_called(config):
+        raise AssertionError("unsupported language must not reach the LLM")
+
+    monkeypatch.setattr("repoatlas.cli.create_llm_client", fail_if_called)
+
+    exit_code = main(
+        [
+            str(repo_dir),
+            "--model",
+            "test-model",
+            "--base-url",
+            "https://example.test/v1",
+            "--lang",
+            "russian",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "Unsupported language: russian" in captured.err
+    assert "Supported languages:" in captured.err
+    assert "en" in captured.err
+    assert "English" in captured.err
+    assert "zh-CN" in captured.err
+    assert "简体中文" in captured.err
+
+
+def test_cli_rejects_unsupported_config_language_before_llm(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+):
+    repo_dir = tmp_path / "sample_repo"
+    repo_dir.mkdir()
+    (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / ".repoatlas.toml").write_text(
+        """[llm]
+model = "test-model"
+base_url = "https://example.test/v1"
+language = "russian"
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    def fail_if_called(config):
+        raise AssertionError("unsupported config language must not reach the LLM")
+
+    monkeypatch.setattr("repoatlas.cli.create_llm_client", fail_if_called)
+
+    assert main([str(repo_dir)]) == 2
+    assert "Unsupported language: russian" in capsys.readouterr().err
+
+
+def test_unsupported_language_error_supports_limited_console_encoding(
+    monkeypatch,
+):
+    raw_stderr = BytesIO()
+    limited_stderr = TextIOWrapper(
+        raw_stderr,
+        encoding="gbk",
+        write_through=True,
+    )
+    monkeypatch.setattr(sys, "stderr", limited_stderr)
+
+    assert main([".", "--lang", "russian", "--no-llm"]) == 2
+
+    message = raw_stderr.getvalue().decode("utf-8")
+    assert "Unsupported language: russian" in message
+    assert "简体中文" in message
+    assert "한국어" in message
+
+
+def test_no_llm_overrides_project_config(tmp_path: Path, monkeypatch):
+    repo_dir = tmp_path / "sample_repo"
+    repo_dir.mkdir()
+    (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / ".repoatlas.toml").write_text(
+        """[llm]
+provider = "config-provider"
+model = "config-model"
+base_url = "https://config.example/v1"
+language = "zh-CN"
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    def fail_if_called(config):
+        raise AssertionError(
+            "create_llm_client should not be called when --no-llm is enabled"
+        )
+
+    monkeypatch.setattr("repoatlas.cli.create_llm_client", fail_if_called)
+
+    exit_code = main(
+        [
+            str(repo_dir),
+            "--output-dir",
+            str(tmp_path / "output"),
+            "--no-llm",
+        ]
+    )
+
+    assert exit_code == 0
+
+
+def test_cli_default_provider_completes_explicit_llm_options(
+    tmp_path: Path, monkeypatch
+):
+    repo_dir = tmp_path / "sample_repo"
+    repo_dir.mkdir()
+    (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
+    captured_config = None
+
+    def capture_client(config):
+        nonlocal captured_config
+        captured_config = config
+        return FakeLLM()
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("repoatlas.cli.create_llm_client", capture_client)
+
+    exit_code = main(
+        [
+            str(repo_dir),
+            "--output-dir",
+            str(tmp_path / "output"),
+            "--model",
+            "cli-model",
+            "--base-url",
+            "https://cli.example/v1",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured_config.provider == "openai-compatible"
+
+
+def test_cli_reads_api_key_only_from_environment(tmp_path: Path, monkeypatch):
+    repo_dir = tmp_path / "sample_repo"
+    repo_dir.mkdir()
+    (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
+    captured_config = None
+
+    def capture_client(config):
+        nonlocal captured_config
+        captured_config = config
+        return FakeLLM()
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("REPOATLAS_API_KEY", "environment-secret")
+    monkeypatch.setattr("repoatlas.cli.create_llm_client", capture_client)
+
+    exit_code = main(
+        [
+            str(repo_dir),
+            "--output-dir",
+            str(tmp_path / "output"),
+            "--model",
+            "cli-model",
+            "--base-url",
+            "https://cli.example/v1",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured_config.api_key == "environment-secret"
+
+
+def test_empty_init_config_does_not_enable_llm(tmp_path: Path, monkeypatch):
+    repo_dir = tmp_path / "sample_repo"
+    repo_dir.mkdir()
+    (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    assert main(["init"]) == 0
+
+    def fail_if_called(config):
+        raise AssertionError("an unfilled template must not enable LLM features")
+
+    monkeypatch.setattr("repoatlas.cli.create_llm_client", fail_if_called)
+
+    assert main(
+        [
+            str(repo_dir),
+            "--output-dir",
+            str(tmp_path / "output"),
+        ]
+    ) == 0

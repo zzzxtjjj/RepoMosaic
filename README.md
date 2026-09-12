@@ -46,6 +46,31 @@ Both commands perform local static analysis. `--no-llm` explicitly disables mode
 To opt into semantic summaries, configure your provider and run:
 
 ```powershell
+repoatlas init
+```
+
+Edit the generated `.repoatlas.toml`:
+
+```toml
+[llm]
+provider = "openai-compatible"
+model = ""
+base_url = ""
+language = "en"
+```
+
+Fill in `model` and `base_url`, then set the API key in your environment:
+
+```powershell
+$env:REPOATLAS_API_KEY = "<your-provider-api-key>"
+repoatlas .
+```
+
+Command-line options take precedence over `.repoatlas.toml`, which takes precedence over built-in defaults. `--no-llm` always disables LLM features. `repoatlas init` refuses to replace an existing file unless `--force` is supplied.
+
+The existing command-line options remain available:
+
+```powershell
 $env:REPOATLAS_API_KEY = "<your-provider-api-key>"
 repoatlas . `
   --provider openai-compatible `
@@ -54,7 +79,7 @@ repoatlas . `
   --lang en
 ```
 
-`python -m repoatlas` accepts the same options as the installed `repoatlas` command. Supported summary languages are `zh-CN`, `en`, `ja`, `ko`, `de`, `it`, `pt`, and `es`.
+`python -m repoatlas` accepts the same options as the installed `repoatlas` command. Canonical summary language codes are `en`, `zh-CN`, `ja`, `ko`, `de`, `it`, `pt`, and `es`; common names and aliases such as `English`, `中文`, and `日本語` are accepted and normalized to these codes.
 
 ## Example
 
