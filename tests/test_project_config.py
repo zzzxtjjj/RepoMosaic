@@ -7,6 +7,7 @@ from repoatlas.project_config import (
     ProjectConfigError,
     load_project_config,
     write_project_config,
+    write_project_config_values,
 )
 from repoatlas.semantic.languages import SUPPORTED_LANGUAGES
 
@@ -45,6 +46,39 @@ def test_init_force_overwrites_existing_config(tmp_path: Path):
     write_project_config(tmp_path, force=True)
 
     assert "[llm]" in config_path.read_text(encoding="utf-8")
+
+
+def test_interactive_config_values_are_concise_and_exclude_api_key(tmp_path: Path):
+    config_path = write_project_config_values(
+        tmp_path,
+        model="  qwen-flash  ",
+        base_url="  https://example.test/v1  ",
+        language="zh-CN",
+    )
+    content = config_path.read_text(encoding="utf-8")
+
+    assert content == """[llm]
+provider = "openai-compatible"
+model = "qwen-flash"
+base_url = "https://example.test/v1"
+language = "zh-CN"
+"""
+    assert "api_key" not in content.casefold()
+
+
+def test_interactive_config_force_overwrites_existing_file(tmp_path: Path):
+    config_path = tmp_path / CONFIG_FILENAME
+    config_path.write_text("original\n", encoding="utf-8")
+
+    write_project_config_values(
+        tmp_path,
+        model="model",
+        base_url="https://example.test/v1",
+        language="en",
+        force=True,
+    )
+
+    assert 'model = "model"' in config_path.read_text(encoding="utf-8")
 
 
 def test_load_project_config(tmp_path: Path):

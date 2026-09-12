@@ -219,13 +219,88 @@ def test_cli_init_creates_config_in_current_directory(
     tmp_path: Path, monkeypatch, capsys
 ):
     monkeypatch.chdir(tmp_path)
+    answers = iter(["  qwen-flash  ", "  https://example.test/v1  ", "2"])
+    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
 
     assert main(["init"]) == 0
 
     captured = capsys.readouterr()
-    assert (tmp_path / ".repoatlas.toml").exists()
-    assert "Created:" in captured.out
+    content = (tmp_path / ".repoatlas.toml").read_text(encoding="utf-8")
+    assert 'provider = "openai-compatible"' in content
+    assert 'model = "qwen-flash"' in content
+    assert 'base_url = "https://example.test/v1"' in content
+    assert 'language = "zh-CN"' in content
+    assert "api_key" not in content.casefold()
+    assert "Created .repoatlas.toml" in captured.out
     assert "REPOATLAS_API_KEY" in captured.out
+    assert '$env:REPOATLAS_API_KEY="YOUR_API_KEY"' in captured.out
+
+
+def test_cli_init_defaults_language_and_retries_invalid_answers(
+    tmp_path: Path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    answers = iter([" ", "model-a", "", "https://example.test", "9", "wrong", ""])
+    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+
+    assert main(["init"]) == 0
+
+    content = (tmp_path / ".repoatlas.toml").read_text(encoding="utf-8")
+    captured = capsys.readouterr()
+    assert 'language = "en"' in content
+    assert "Model cannot be empty" in captured.out
+    assert "Base URL cannot be empty" in captured.out
+    assert captured.out.count("Please enter a number from 1 to 8.") == 2
+
+
+def test_cli_init_noninteractive_recommends_template(tmp_path: Path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: False)
+
+    assert main(["init"]) == 2
+
+    captured = capsys.readouterr()
+    assert "interactive terminal" in captured.err
+    assert "repoatlas init --template" in captured.err
+    assert not (tmp_path / ".repoatlas.toml").exists()
+
+
+def test_cli_init_template_and_force(tmp_path: Path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["init", "--template"]) == 0
+    config_path = tmp_path / ".repoatlas.toml"
+    assert "# Supported values:" in config_path.read_text(encoding="utf-8")
+
+    config_path.write_text("original\n", encoding="utf-8")
+    assert main(["init", "--template"]) == 2
+    assert "repoatlas init --template --force" in capsys.readouterr().err
+    assert config_path.read_text(encoding="utf-8") == "original\n"
+
+    assert main(["init", "--template", "--force"]) == 0
+    assert "# Supported values:" in config_path.read_text(encoding="utf-8")
+    assert "original" not in config_path.read_text(encoding="utf-8")
+    assert "Created .repoatlas.toml" in capsys.readouterr().out
+
+
+def test_cli_interactive_init_force_replaces_existing_config(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / ".repoatlas.toml"
+    config_path.write_text("original\n", encoding="utf-8")
+    answers = iter(["replacement-model", "https://replacement.test", "3"])
+    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+
+    assert main(["init", "--force"]) == 0
+
+    content = config_path.read_text(encoding="utf-8")
+    assert 'model = "replacement-model"' in content
+    assert 'language = "ja"' in content
+    assert "original" not in content
 
 
 def test_cli_init_refuses_to_overwrite_existing_config(
@@ -517,7 +592,7 @@ def test_empty_init_config_does_not_enable_llm(tmp_path: Path, monkeypatch):
     repo_dir.mkdir()
     (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
-    assert main(["init"]) == 0
+    assert main(["init", "--template"]) == 0
 
     def fail_if_called(config):
         raise AssertionError("an unfilled template must not enable LLM features")

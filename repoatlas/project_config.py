@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import tomllib
 
@@ -55,6 +56,36 @@ def write_project_config(directory: Path, *, force: bool = False) -> Path:
         )
 
     config_path.write_text(CONFIG_TEMPLATE, encoding="utf-8")
+    return config_path
+
+
+def write_project_config_values(
+    directory: Path,
+    *,
+    model: str,
+    base_url: str,
+    language: str,
+    force: bool = False,
+) -> Path:
+    """写入交互式初始化收集到的精简项目配置。"""
+    config_path = directory / CONFIG_FILENAME
+
+    if config_path.exists() and not force:
+        raise FileExistsError(
+            f"{config_path} already exists; use --force to overwrite it."
+        )
+
+    content = "\n".join(
+        [
+            "[llm]",
+            f'provider = {json.dumps(DEFAULT_PROVIDER, ensure_ascii=False)}',
+            f'model = {json.dumps(model.strip(), ensure_ascii=False)}',
+            f'base_url = {json.dumps(base_url.strip(), ensure_ascii=False)}',
+            f'language = {json.dumps(language, ensure_ascii=False)}',
+            "",
+        ]
+    )
+    config_path.write_text(content, encoding="utf-8")
     return config_path
 
 

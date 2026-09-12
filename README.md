@@ -30,43 +30,25 @@ Structural facts, docstrings, and optional semantic summaries provide that conte
 
 ## Quick Start
 
-From a local clone or source checkout:
+Install RepoAtlas and run the first-time setup:
 
 ```powershell
-cd repoatlas
-uv venv --python 3.12
-.\.venv\Scripts\Activate.ps1
-uv pip install -e ".[dev]"
-repoatlas .
-repoatlas . --no-llm
-```
-
-Both commands perform local static analysis. `--no-llm` explicitly disables model API calls, even if LLM options are also present.
-
-To opt into semantic summaries, configure your provider and run:
-
-```powershell
+pip install repoatlas
 repoatlas init
-```
-
-Edit the generated `.repoatlas.toml`:
-
-```toml
-[llm]
-provider = "openai-compatible"
-model = ""
-base_url = ""
-language = "en"
-```
-
-Fill in `model` and `base_url`, then set the API key in your environment:
-
-```powershell
+# Answer the model, base URL, and output-language prompts.
 $env:REPOATLAS_API_KEY = "<your-provider-api-key>"
 repoatlas .
 ```
 
-Command-line options take precedence over `.repoatlas.toml`, which takes precedence over built-in defaults. `--no-llm` always disables LLM features. `repoatlas init` refuses to replace an existing file unless `--force` is supplied.
+For local static analysis without model API calls:
+
+```powershell
+repoatlas . --no-llm
+```
+
+`repoatlas init` writes `.repoatlas.toml` automatically and never stores the API key. Advanced users can create the commented manual-editing version with `repoatlas init --template`. The command refuses to replace an existing configuration unless `--force` is supplied.
+
+Command-line options take precedence over `.repoatlas.toml`, which takes precedence over built-in defaults. `--no-llm` always disables LLM features.
 
 The existing command-line options remain available:
 

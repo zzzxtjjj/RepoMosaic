@@ -8,7 +8,7 @@ from typing import Sequence
 from repoatlas import __version__
 from repoatlas.core.analyzer import analyze_repository
 from repoatlas.rendering.visualizer import render_visual_map
-from repoatlas.semantic.languages import normalize_language
+from repoatlas.semantic.languages import SUPPORTED_LANGUAGES, normalize_language
 from repoatlas.llm.config import LLMConfig
 from repoatlas.llm.factory import create_llm_client
 from repoatlas.semantic.summarizer import summarize_repository
@@ -19,6 +19,7 @@ from repoatlas.project_config import (
     ProjectConfigError,
     load_project_config,
     write_project_config,
+    write_project_config_values,
 )
 
 
@@ -102,14 +103,67 @@ def build_init_parser() -> argparse.ArgumentParser:
     """Create the parser for ``repoatlas init``."""
     parser = argparse.ArgumentParser(
         prog="repoatlas init",
-        description="Create a .repoatlas.toml template in the current directory.",
+        description="Set up .repoatlas.toml in the current directory.",
     )
     parser.add_argument(
         "--force",
         action="store_true",
         help="Overwrite an existing .repoatlas.toml file.",
     )
+    parser.add_argument(
+        "--template",
+        action="store_true",
+        help="Create a commented configuration template for manual editing.",
+    )
     return parser
+
+
+def _stdin_is_interactive() -> bool:
+    """判断当前标准输入是否适合交互式配置。"""
+    try:
+        return bool(sys.stdin.isatty())
+    except (AttributeError, OSError):
+        return False
+
+
+def _prompt_required(label: str) -> str:
+    """读取必填文本，并在空输入时给出简短重试提示。"""
+    while True:
+        value = input(f"{label}:\n> ").strip()
+        if value:
+            return value
+        print(f"{label} cannot be empty. Please try again.\n")
+
+
+def _prompt_language() -> str:
+    """用编号选择输出语言，并返回 canonical language code。"""
+    languages = list(SUPPORTED_LANGUAGES.items())
+    print("Output language:")
+    for index, (_, name) in enumerate(languages, start=1):
+        print(f"  {index}. {name}")
+
+    while True:
+        selection = input(f"\nChoose [1-{len(languages)}] [default: 1]:\n> ").strip()
+        if not selection:
+            return languages[0][0]
+        try:
+            index = int(selection)
+        except ValueError:
+            index = 0
+        if 1 <= index <= len(languages):
+            return languages[index - 1][0]
+        print(f"Please enter a number from 1 to {len(languages)}.")
+
+
+def _print_init_next_steps() -> None:
+    """提示用户仅通过环境变量提供 API key。"""
+    print("\nNext:")
+    print("Set REPOATLAS_API_KEY in your environment, then run:\n")
+    if os.name == "nt":
+        print('    $env:REPOATLAS_API_KEY="YOUR_API_KEY"')
+    else:
+        print('    export REPOATLAS_API_KEY="YOUR_API_KEY"')
+    print("    repoatlas .")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -118,14 +172,54 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if arguments and arguments[0] == "init":
         init_args = build_init_parser().parse_args(arguments[1:])
+        config_path = Path.cwd() / ".repoatlas.toml"
+        if config_path.exists() and not init_args.force:
+            force_command = (
+                "repoatlas init --template --force"
+                if init_args.template
+                else "repoatlas init --force"
+            )
+            print(
+                "RepoAtlas configuration already exists:\n"
+                ".repoatlas.toml\n\n"
+                f"Use:\n{force_command}",
+                file=sys.stderr,
+            )
+            return 2
+
+        if not init_args.template and not _stdin_is_interactive():
+            print(
+                "RepoAtlas init needs an interactive terminal.\n"
+                "Use 'repoatlas init --template' to create a manual template.",
+                file=sys.stderr,
+            )
+            return 2
+
         try:
-            config_path = write_project_config(Path.cwd(), force=init_args.force)
+            if init_args.template:
+                config_path = write_project_config(
+                    Path.cwd(), force=init_args.force
+                )
+            else:
+                print("RepoAtlas setup\n")
+                model = _prompt_required("Model")
+                print()
+                base_url = _prompt_required("Base URL")
+                print()
+                language = _prompt_language()
+                config_path = write_project_config_values(
+                    Path.cwd(),
+                    model=model,
+                    base_url=base_url,
+                    language=language,
+                    force=init_args.force,
+                )
         except (FileExistsError, OSError) as error:
             print(f"RepoAtlas error: {error}", file=sys.stderr)
             return 2
 
-        print(f"Created: {config_path}")
-        print("Set REPOATLAS_API_KEY in your environment before using LLM features.")
+        print(f"\nCreated {config_path.name}")
+        _print_init_next_steps()
         return 0
 
     args = build_parser().parse_args(arguments)
