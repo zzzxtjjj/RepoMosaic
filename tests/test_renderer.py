@@ -1,5 +1,11 @@
 from repoatlas.core.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
-from repoatlas.rendering.renderer import render_mindmap, render_structure_markdown, build_source_link
+import repoatlas.rendering.renderer as renderer_module
+from repoatlas.rendering.renderer import (
+    build_source_link,
+    render_mindmap,
+    render_structure_markdown,
+    render_symbol_link,
+)
 
 
 def make_repository() -> RepositoryInfo:
@@ -196,3 +202,62 @@ def test_build_source_link_from_nested_output_directory(tmp_path):
     )
 
     assert link == "../../main.py"
+
+
+def test_build_source_link_encodes_special_path_characters(tmp_path):
+    repo_dir = tmp_path / "repo"
+    output_dir = repo_dir / "docs"
+    output_dir.mkdir(parents=True)
+
+    cases = {
+        "my package/parser.py": "../my%20package/parser.py",
+        "module#old.py": "../module%23old.py",
+        "module(test).py": "../module%28test%29.py",
+        "模块.py": "../%E6%A8%A1%E5%9D%97.py",
+    }
+
+    for file_path, expected in cases.items():
+        assert build_source_link(repo_dir, file_path, output_dir) == expected
+
+
+def test_render_symbol_link_appends_anchor_after_encoded_filename():
+    link = render_symbol_link(
+        "../my package/module#old(test).py",
+        "module#old(test).py",
+        10,
+        20,
+    )
+
+    assert link == (
+        "[module#old(test).py]"
+        "(../my%20package/module%23old%28test%29.py#L10-L20)"
+    )
+
+
+def test_render_symbol_link_escapes_markdown_label_brackets():
+    link = render_symbol_link("module.py", "module[old].py")
+
+    assert link == r"[module\[old\].py](module.py)"
+
+
+def test_build_source_link_uses_file_uri_when_relative_path_is_unavailable(
+    tmp_path,
+    monkeypatch,
+):
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    source_file = repo_dir / "my package" / "parser.py"
+    source_file.parent.mkdir()
+    source_file.write_text("value = 1\n", encoding="utf-8")
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    def raise_cross_drive_error(*args, **kwargs):
+        raise ValueError("path is on a different drive")
+
+    monkeypatch.setattr(renderer_module.os.path, "relpath", raise_cross_drive_error)
+
+    link = build_source_link(repo_dir, "my package/parser.py", output_dir)
+
+    assert link.startswith("file:///")
+    assert link.endswith("/repo/my%20package/parser.py")

@@ -3,12 +3,23 @@ import os
 from pathlib import Path
 from repoatlas.core.paths import resolve_repository_file
 import re
-from pathlib import PurePosixPath
+from urllib.parse import quote
 from repoatlas.core.parser import build_signature
 from repoatlas.core.symbols import FileInfo, FunctionInfo, RepositoryInfo
 
 
 DEFAULT_DESCRIPTION = "No description available."
+
+
+def _encode_markdown_target(target: str) -> str:
+    """编码链接路径，同时保留目录分隔符、盘符和已有转义。"""
+    normalized = target.replace("\\", "/")
+    return quote(normalized, safe="/:%")
+
+
+def _escape_markdown_label(label: str) -> str:
+    """转义链接显示文字中会破坏 Markdown 结构的字符。"""
+    return label.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
 
 
 def sanitize_mermaid_text(text: str) -> str:
@@ -44,13 +55,12 @@ def render_symbol_link(
     end_line: int | None = None,
 ) -> str:
     """生成 GitHub Markdown 相对链接，便于以后替换其他链接策略。"""
-    normalized_path = PurePosixPath(file_path.replace("\\", "/")).as_posix()
-    target = normalized_path
+    target = _encode_markdown_target(file_path)
     if start_line is not None:
         target += f"#L{start_line}"
         if end_line is not None and end_line != start_line:
             target += f"-L{end_line}"
-    return f"[{label}]({target})"
+    return f"[{_escape_markdown_label(label)}]({target})"
 
 
 def _node_id(prefix: str, *parts: object) -> str:
@@ -358,9 +368,13 @@ def build_source_link(
 
     output_root = Path(output_dir).expanduser().resolve()
     
-    relative_path = os.path.relpath(
-        source_path,
-        start=output_root,
-    )
+    try:
+        relative_path = os.path.relpath(
+            source_path,
+            start=output_root,
+        )
+    except ValueError:
+        # Windows 不同盘符无法生成相对路径，回退到有效的 file URI。
+        return _encode_markdown_target(source_path.as_uri())
 
-    return Path(relative_path).as_posix()
+    return _encode_markdown_target(Path(relative_path).as_posix())
