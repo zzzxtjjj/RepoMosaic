@@ -21,7 +21,7 @@ _LANGUAGE_TEMPLATE_LINES = "\n".join(
 
 
 CONFIG_TEMPLATE = f"""# RepoAtlas project configuration
-# Set REPOATLAS_API_KEY in your environment; never put API keys in this file.
+# Use `repoatlas auth set` or REPOATLAS_API_KEY; never put API keys in this file.
 
 [llm]
 provider = "openai-compatible"
@@ -108,7 +108,7 @@ def load_project_config(directory: Path) -> ProjectConfig:
     if "api_key" in llm or "api-key" in llm:
         raise ProjectConfigError(
             "API keys are not allowed in .repoatlas.toml; "
-            "use REPOATLAS_API_KEY instead."
+            "use `repoatlas auth set` or REPOATLAS_API_KEY instead."
         )
 
     values: dict[str, str | None] = {}

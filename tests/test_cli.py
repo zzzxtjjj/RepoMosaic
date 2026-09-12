@@ -1,8 +1,10 @@
 from io import BytesIO, TextIOWrapper
 from pathlib import Path
 import sys
+import pytest
 from repoatlas.llm.base import LLMError
 from repoatlas.cli import build_parser, main
+from repoatlas.credentials import CredentialStoreError, ResolvedAPIKey
 
 
 # 模拟真实大模型客户端，避免测试过程中访问网络或消耗 API
@@ -130,6 +132,7 @@ def hello(name):
     )
 
     output_dir = tmp_path / "output"
+    monkeypatch.setenv("REPOATLAS_API_KEY", "test-key")
 
     fake_llm = FakeLLM()
 
@@ -192,6 +195,7 @@ def hello():
         def generate(self, prompt: str) -> str:
             raise LLMError("LLM request timed out.")
 
+    monkeypatch.setenv("REPOATLAS_API_KEY", "test-key")
     monkeypatch.setattr(
         "repoatlas.cli.create_llm_client",
         lambda config: FailingLLM(),
@@ -233,8 +237,8 @@ def test_cli_init_creates_config_in_current_directory(
     assert 'language = "zh-CN"' in content
     assert "api_key" not in content.casefold()
     assert "Created .repoatlas.toml" in captured.out
-    assert "REPOATLAS_API_KEY" in captured.out
-    assert '$env:REPOATLAS_API_KEY="YOUR_API_KEY"' in captured.out
+    assert "repoatlas auth set" in captured.out
+    assert "YOUR_API_KEY" not in captured.out
 
 
 def test_cli_init_defaults_language_and_retries_invalid_answers(
@@ -317,6 +321,113 @@ def test_cli_init_refuses_to_overwrite_existing_config(
     assert config_path.read_text(encoding="utf-8") == "original\n"
 
 
+def test_cli_auth_set_uses_hidden_input_and_never_prints_key(monkeypatch, capsys):
+    saved = []
+    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: True)
+    monkeypatch.setattr(
+        "repoatlas.cli.getpass.getpass",
+        lambda prompt: "  test-hidden-key  ",
+    )
+    monkeypatch.setattr("repoatlas.cli.set_stored_api_key", saved.append)
+
+    assert main(["auth", "set"]) == 0
+
+    output = capsys.readouterr().out
+    assert saved == ["test-hidden-key"]
+    assert "saved securely" in output
+    assert "test-hidden-key" not in output
+
+
+def test_cli_auth_set_retries_empty_input(monkeypatch, capsys):
+    answers = iter([" ", "test-key"])
+    saved = []
+    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: True)
+    monkeypatch.setattr("repoatlas.cli.getpass.getpass", lambda prompt: next(answers))
+    monkeypatch.setattr("repoatlas.cli.set_stored_api_key", saved.append)
+
+    assert main(["auth", "set"]) == 0
+    assert saved == ["test-key"]
+    assert "cannot be empty" in capsys.readouterr().out
+
+
+def test_cli_auth_set_rejects_noninteractive_input(monkeypatch, capsys):
+    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: False)
+    monkeypatch.setattr(
+        "repoatlas.cli.getpass.getpass",
+        lambda prompt: pytest.fail("hidden input should not be requested"),
+    )
+
+    assert main(["auth", "set"]) == 2
+    assert "interactive terminal" in capsys.readouterr().err
+
+
+def test_cli_auth_status_reports_source_without_secret(monkeypatch, capsys):
+    monkeypatch.setattr(
+        "repoatlas.cli.resolve_api_key",
+        lambda: ResolvedAPIKey("test-secret", "system credential store"),
+    )
+
+    assert main(["auth", "status"]) == 0
+
+    output = capsys.readouterr().out
+    assert "API key configured: yes" in output
+    assert "Source: system credential store" in output
+    assert "test-secret" not in output
+
+
+def test_cli_auth_status_reports_missing_key(monkeypatch, capsys):
+    monkeypatch.setattr("repoatlas.cli.resolve_api_key", lambda: None)
+
+    assert main(["auth", "status"]) == 0
+    assert capsys.readouterr().out.strip() == "API key configured: no"
+
+
+def test_cli_auth_backend_error_is_clean(monkeypatch, capsys):
+    def fail():
+        raise CredentialStoreError("Credential store unavailable.")
+
+    monkeypatch.setattr("repoatlas.cli.resolve_api_key", fail)
+
+    assert main(["auth", "status"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.strip() == (
+        "RepoAtlas error: Credential store unavailable."
+    )
+
+
+def test_cli_auth_clear_handles_present_and_missing_key(monkeypatch, capsys):
+    monkeypatch.setattr("repoatlas.cli.clear_stored_api_key", lambda: True)
+    assert main(["auth", "clear"]) == 0
+    assert "API key removed" in capsys.readouterr().out
+
+    monkeypatch.setattr("repoatlas.cli.clear_stored_api_key", lambda: False)
+    assert main(["auth", "clear"]) == 0
+    assert "No stored RepoAtlas API key found" in capsys.readouterr().out
+
+
+def test_cli_llm_mode_reports_actionable_missing_key(tmp_path, monkeypatch, capsys):
+    repo_dir = tmp_path / "sample_repo"
+    repo_dir.mkdir()
+    (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
+    monkeypatch.setattr("repoatlas.cli.resolve_api_key", lambda: None)
+
+    assert main(
+        [
+            str(repo_dir),
+            "--model",
+            "test-model",
+            "--base-url",
+            "https://example.test/v1",
+        ]
+    ) == 2
+
+    error = capsys.readouterr().err
+    assert "No API key configured" in error
+    assert "repoatlas auth set" in error
+    assert "REPOATLAS_API_KEY" in error
+
+
 def test_cli_uses_config_and_cli_values_take_precedence(
     tmp_path: Path, monkeypatch
 ):
@@ -333,6 +444,7 @@ language = "中文"
         encoding="utf-8",
     )
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("REPOATLAS_API_KEY", "test-key")
     captured_config = None
     captured_language = None
 
@@ -531,6 +643,7 @@ def test_cli_default_provider_completes_explicit_llm_options(
     repo_dir.mkdir()
     (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
     captured_config = None
+    monkeypatch.setenv("REPOATLAS_API_KEY", "test-key")
 
     def capture_client(config):
         nonlocal captured_config
@@ -585,6 +698,41 @@ def test_cli_reads_api_key_only_from_environment(tmp_path: Path, monkeypatch):
 
     assert exit_code == 0
     assert captured_config.api_key == "environment-secret"
+    for output_path in (tmp_path / "output").iterdir():
+        assert "environment-secret" not in output_path.read_text(encoding="utf-8")
+
+
+def test_cli_uses_api_key_from_system_store(tmp_path: Path, monkeypatch):
+    repo_dir = tmp_path / "sample_repo"
+    repo_dir.mkdir()
+    (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
+    captured_config = None
+
+    def capture_client(config):
+        nonlocal captured_config
+        captured_config = config
+        return FakeLLM()
+
+    monkeypatch.delenv("REPOATLAS_API_KEY", raising=False)
+    monkeypatch.setattr(
+        "repoatlas.cli.resolve_api_key",
+        lambda: ResolvedAPIKey("test-stored-key", "system credential store"),
+    )
+    monkeypatch.setattr("repoatlas.cli.create_llm_client", capture_client)
+
+    assert main(
+        [
+            str(repo_dir),
+            "--output-dir",
+            str(tmp_path / "output"),
+            "--model",
+            "test-model",
+            "--base-url",
+            "https://example.test/v1",
+        ]
+    ) == 0
+
+    assert captured_config.api_key == "test-stored-key"
 
 
 def test_empty_init_config_does_not_enable_llm(tmp_path: Path, monkeypatch):

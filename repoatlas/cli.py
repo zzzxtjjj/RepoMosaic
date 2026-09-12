@@ -1,12 +1,18 @@
 """RepoAtlas 命令行入口。"""
 import argparse
-import os
+import getpass
 from pathlib import Path
 import sys
 from typing import Sequence
 
 from repoatlas import __version__
 from repoatlas.core.analyzer import analyze_repository
+from repoatlas.credentials import (
+    CredentialStoreError,
+    clear_stored_api_key,
+    resolve_api_key,
+    set_stored_api_key,
+)
 from repoatlas.rendering.visualizer import render_visual_map
 from repoatlas.semantic.languages import SUPPORTED_LANGUAGES, normalize_language
 from repoatlas.llm.config import LLMConfig
@@ -45,6 +51,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="repoatlas",
         description="Generate a repository knowledge map using static analysis.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "commands:\n"
+            "  repoatlas init         Configure the current project\n"
+            "  repoatlas auth set     Save the user-level API key\n"
+            "  repoatlas auth status  Check API-key availability\n"
+            "  repoatlas auth clear   Remove the stored API key"
+        ),
     )
 
     parser.add_argument(
@@ -118,6 +132,19 @@ def build_init_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def build_auth_parser() -> argparse.ArgumentParser:
+    """Create the parser for user-level credential commands."""
+    parser = argparse.ArgumentParser(
+        prog="repoatlas auth",
+        description="Manage RepoAtlas's user-level API credential.",
+    )
+    commands = parser.add_subparsers(dest="auth_command", required=True)
+    commands.add_parser("set", help="Save the default API key securely.")
+    commands.add_parser("status", help="Show whether an API key is configured.")
+    commands.add_parser("clear", help="Remove the stored RepoAtlas API key.")
+    return parser
+
+
 def _stdin_is_interactive() -> bool:
     """判断当前标准输入是否适合交互式配置。"""
     try:
@@ -156,14 +183,51 @@ def _prompt_language() -> str:
 
 
 def _print_init_next_steps() -> None:
-    """提示用户仅通过环境变量提供 API key。"""
+    """提示用户通过用户级凭据存储提供 API key。"""
     print("\nNext:")
-    print("Set REPOATLAS_API_KEY in your environment, then run:\n")
-    if os.name == "nt":
-        print('    $env:REPOATLAS_API_KEY="YOUR_API_KEY"')
-    else:
-        print('    export REPOATLAS_API_KEY="YOUR_API_KEY"')
+    print("If needed, save your API key once, then run:\n")
+    print("    repoatlas auth set")
     print("    repoatlas .")
+
+
+def _run_auth_command(arguments: Sequence[str]) -> int:
+    """执行用户级 API key 的保存、检查或删除操作。"""
+    args = build_auth_parser().parse_args(arguments)
+
+    try:
+        if args.auth_command == "set":
+            if not _stdin_is_interactive():
+                print(
+                    "RepoAtlas auth set needs an interactive terminal.",
+                    file=sys.stderr,
+                )
+                return 2
+            print("RepoAtlas authentication\n")
+            while True:
+                api_key = getpass.getpass("API key:\n> ").strip()
+                if api_key:
+                    break
+                print("API key cannot be empty. Please try again.\n")
+            set_stored_api_key(api_key)
+            print("\nRepoAtlas API key saved securely.")
+            print("\nNext:\n  cd path/to/project\n  repoatlas init\n  repoatlas .")
+            return 0
+
+        if args.auth_command == "status":
+            credential = resolve_api_key()
+            print(f"API key configured: {'yes' if credential else 'no'}")
+            if credential:
+                print(f"Source: {credential.source}")
+            return 0
+
+        if clear_stored_api_key():
+            print("RepoAtlas API key removed.")
+        else:
+            print("No stored RepoAtlas API key found.")
+        return 0
+    except (CredentialStoreError, ValueError) as error:
+        print(f"RepoAtlas error: {error}", file=sys.stderr)
+        return 2
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -221,6 +285,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"\nCreated {config_path.name}")
         _print_init_next_steps()
         return 0
+
+    if arguments and arguments[0] == "auth":
+        return _run_auth_command(arguments[1:])
 
     args = build_parser().parse_args(arguments)
 
@@ -283,12 +350,25 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return 2
 
-        api_key = os.getenv("REPOATLAS_API_KEY")
+        try:
+            credential = resolve_api_key()
+        except CredentialStoreError as error:
+            print(f"RepoAtlas error: {error}", file=sys.stderr)
+            return 2
+
+        if credential is None:
+            print(
+                "RepoAtlas error: No API key configured.\n\n"
+                "Run:\n  repoatlas auth set\n\n"
+                "For temporary use you may set:\n  REPOATLAS_API_KEY",
+                file=sys.stderr,
+            )
+            return 2
 
         llm_config = LLMConfig(
             provider=provider,
             model=model,
-            api_key=api_key,
+            api_key=credential.value,
             base_url=base_url,
         )
 

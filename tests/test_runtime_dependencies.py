@@ -1,5 +1,6 @@
 import ast
 from pathlib import Path
+import tomllib
 
 
 def test_production_package_does_not_import_pytest():
@@ -21,3 +22,13 @@ def test_production_package_does_not_import_pytest():
                 offenders.append(source_path.relative_to(package_root).as_posix())
 
     assert offenders == []
+
+
+def test_keyring_is_a_normal_runtime_dependency():
+    project_root = Path(__file__).parents[1]
+    metadata = tomllib.loads(
+        (project_root / "pyproject.toml").read_text(encoding="utf-8")
+    )
+
+    dependencies = metadata["project"]["dependencies"]
+    assert any(dependency.startswith("keyring") for dependency in dependencies)
