@@ -1,5 +1,5 @@
 from repoatlas.core.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
-from repoatlas.rendering.renderer import render_mindmap, render_structure_markdown
+from repoatlas.rendering.renderer import render_mindmap, render_structure_markdown, build_source_link
 
 
 def make_repository() -> RepositoryInfo:
@@ -147,3 +147,52 @@ def test_mindmap_truncates_description_but_details_keep_it_complete():
     assert long_docstring not in mindmap
     assert "A" * 99 + "…" in mindmap
     assert long_docstring in markdown
+
+
+# 验证 Markdown 源码链接会根据输出目录生成正确的相对路径
+def test_build_source_link_relative_to_output_directory(tmp_path):
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+
+    source_dir = repo_dir / "repoatlas" / "core"
+    source_dir.mkdir(parents=True)
+
+    source_file = source_dir / "parser.py"
+    source_file.write_text(
+        "value = 1\n",
+        encoding="utf-8",
+    )
+
+    output_dir = repo_dir / "repoatlas_output"
+    output_dir.mkdir()
+
+    link = build_source_link(
+        repository_root=repo_dir,
+        file_path="repoatlas/core/parser.py",
+        output_dir=output_dir,
+    )
+
+    assert link == "../repoatlas/core/parser.py"
+
+
+# 验证输出目录嵌套更深时，源码链接仍能正确回到仓库文件
+def test_build_source_link_from_nested_output_directory(tmp_path):
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+
+    source_file = repo_dir / "main.py"
+    source_file.write_text(
+        "value = 1\n",
+        encoding="utf-8",
+    )
+
+    output_dir = repo_dir / "docs" / "generated"
+    output_dir.mkdir(parents=True)
+
+    link = build_source_link(
+        repository_root=repo_dir,
+        file_path="main.py",
+        output_dir=output_dir,
+    )
+
+    assert link == "../../main.py"

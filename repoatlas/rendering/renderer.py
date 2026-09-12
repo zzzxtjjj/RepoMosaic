@@ -1,8 +1,9 @@
 """把仓库静态分析结果渲染为人类可读的 Markdown 代码地图。"""
-
+import os
+from pathlib import Path
+from repoatlas.core.paths import resolve_repository_file
 import re
 from pathlib import PurePosixPath
-
 from repoatlas.core.parser import build_signature
 from repoatlas.core.symbols import FileInfo, FunctionInfo, RepositoryInfo
 
@@ -156,91 +157,141 @@ def _render_symbol_metadata(file_info: FileInfo) -> str:
     return f"Symbols: {' · '.join(parts)}"
 
 
-def _render_file_details(file_info: FileInfo) -> list[str]:
+# 渲染单个 Python 文件的完整 symbol 明细
+def _render_file_details(
+    file_info: FileInfo,
+    source_link: str,
+) -> list[str]:
     """渲染单个 Python 文件的完整 symbol 明细。"""
+
     path = file_info.path
-    lines = [f"## {render_symbol_link(path, path)}", ""]
+
+    # path 用于显示给用户看；
+    # source_link 用于真正的 Markdown 点击跳转。
+    lines = [
+        f"## {render_symbol_link(source_link, path)}",
+        "",
+    ]
+
     lines.append(_render_symbol_metadata(file_info))
 
     lines.extend(["", "### Classes", ""])
+
     if not file_info.classes:
         lines.append("No classes detected.")
     else:
         for class_info in file_info.classes:
             class_link = render_symbol_link(
-                path,
+                source_link,
                 class_info.name,
                 class_info.start_line,
                 class_info.end_line,
             )
+
             lines.extend(
                 [
-                    f"#### {class_link} · {render_line_range(class_info.start_line, class_info.end_line)}",
+                    (
+                        f"#### {class_link} · "
+                        f"{render_line_range(class_info.start_line, class_info.end_line)}"
+                    ),
                     "",
                     _description(class_info.docstring),
                 ]
             )
+
             class_methods = [
                 method
                 for method in file_info.methods
                 if method.class_name == class_info.name
             ]
+
             lines.extend(["", "Methods:", ""])
+
             if not class_methods:
                 lines.append("No methods detected.")
+
             for method in class_methods:
-                signature = build_signature(method, is_method=True)
+                signature = build_signature(
+                    method,
+                    is_method=True,
+                )
+
                 method_link = render_symbol_link(
-                    path,
+                    source_link,
                     signature,
                     method.start_line,
                     method.end_line,
                 )
+
                 lines.extend(
                     [
-                        f"- {method_link} · {render_line_range(method.start_line, method.end_line)}",
+                        (
+                            f"- {method_link} · "
+                            f"{render_line_range(method.start_line, method.end_line)}"
+                        ),
                         f"  - {_description(method.docstring)}",
                     ]
                 )
 
     lines.extend(["", "### Functions", ""])
+
     if not file_info.functions:
         lines.append("No functions detected.")
+
     for function in file_info.functions:
         signature = build_signature(function)
+
         function_link = render_symbol_link(
-            path,
+            source_link,
             signature,
             function.start_line,
             function.end_line,
         )
+
         lines.extend(
             [
-                f"- {function_link} · {render_line_range(function.start_line, function.end_line)}",
+                (
+                    f"- {function_link} · "
+                    f"{render_line_range(function.start_line, function.end_line)}"
+                ),
                 "",
                 f"  - {_description(function.docstring)}",
             ]
         )
 
-    known_classes = {class_info.name for class_info in file_info.classes}
+    known_classes = {
+        class_info.name
+        for class_info in file_info.classes
+    }
+
     unmatched_methods = [
         method
         for method in file_info.methods
         if method.class_name not in known_classes
     ]
+
     if unmatched_methods:
         lines.extend(["", "### Methods", ""])
+
         for method in unmatched_methods:
-            signature = build_signature(method, is_method=True)
+            signature = build_signature(
+                method,
+                is_method=True,
+            )
+
             method_link = render_symbol_link(
-                path,
+                source_link,
                 signature,
                 method.start_line,
                 method.end_line,
             )
+
             lines.extend(
                 [
-                    f"- {method_link} · {render_line_range(method.start_line, method.end_line)}",
+                    (
+                        f"- {method_link} · "
+                        f"{render_line_range(method.start_line, method.end_line)}"
+                    ),
                     f"  - {_description(method.docstring)}",
                 ]
             )
@@ -248,7 +299,9 @@ def _render_file_details(file_info: FileInfo) -> list[str]:
     return lines
 
 
-def render_structure_markdown(repository: RepositoryInfo) -> str:
+def render_structure_markdown(repository: RepositoryInfo, 
+                              output_dir: str | Path | None = None
+                              ) -> str:
     """生成包含全局思维导图和逐文件明细的完整 STRUCTURE.md。"""
     lines = [
         "# Repository Knowledge Map",
@@ -261,7 +314,26 @@ def render_structure_markdown(repository: RepositoryInfo) -> str:
     ]
 
     for file_info in repository.files:
-        lines.extend(["", *_render_file_details(file_info), "", "---"])
+        if output_dir is not None:
+            source_link = build_source_link(
+                repository.root_path,
+                file_info.path,
+                output_dir,
+            )
+        else:
+            source_link = file_info.path
+
+        lines.extend(
+            [
+                "",
+                *_render_file_details(
+                    file_info,
+                    source_link,
+                ),
+                "",
+                "---",
+            ]
+        )
 
     if repository.files:
         lines.pop()
@@ -269,3 +341,26 @@ def render_structure_markdown(repository: RepositoryInfo) -> str:
         lines.extend(["", DEFAULT_DESCRIPTION])
 
     return "\n".join(lines).rstrip() + "\n"
+
+
+
+# 根据 Markdown 输出目录和仓库文件路径，生成可点击的相对源码链接
+def build_source_link(
+    repository_root: str | Path,
+    file_path: str,
+    output_dir: str | Path,
+) -> str:
+
+    source_path = resolve_repository_file(
+        repository_root,
+        file_path
+    )
+
+    output_root = Path(output_dir).expanduser().resolve()
+    
+    relative_path = os.path.relpath(
+        source_path,
+        start=output_root,
+    )
+
+    return Path(relative_path).as_posix()
