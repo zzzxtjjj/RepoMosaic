@@ -304,6 +304,27 @@ def test_fit_view_keeps_small_graph_readable_and_large_graph_fittable(tmp_path):
     assert large_fit < 0.5
 
 
+def test_canvas_wheel_pans_and_ctrl_wheel_zooms_without_capturing_details(tmp_path):
+    html = render_visual_map(make_repository(), tmp_path / "output")["html"].read_text(
+        encoding="utf-8"
+    )
+
+    assert 'canvas.addEventListener("wheel", event =>' in html
+    assert "if (event.ctrlKey)" in html
+    assert "zoom(Math.exp(-wheelDelta(event, event.deltaY) * .0015)" in html
+    assert "if (event.shiftKey)" in html
+    assert "camera.x -= wheelDelta(event, event.deltaY || event.deltaX)" in html
+    assert "camera.y -= wheelDelta(event, event.deltaY)" in html
+    assert "camera.x -= wheelDelta(event, event.deltaX)" in html
+    assert "}, { passive: false });" in html
+    assert 'document.addEventListener("wheel"' not in html
+    assert ".detail-panel {" in html and "overflow: auto" in html
+    assert ".code-scroll { overflow: auto" in html
+    assert 'canvas.addEventListener("pointermove"' in html
+    for control in ("fit-view", "reset-view", "zoom-in", "zoom-out"):
+        assert f'id="{control}"' in html
+
+
 def test_empty_repository_html_keeps_repository_root(tmp_path):
     repository = RepositoryInfo(root_path="/projects/empty", files=[])
 

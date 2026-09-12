@@ -25,6 +25,33 @@ def test_build_function_prompt():
     assert "x, y" in prompt
     assert "return abs(x - y)" in prompt
     assert "zh-CN" in prompt
+    assert "approximately 2-3 sentences" in prompt
+    assert "concrete operation" in prompt
+    assert "how important inputs are used" in prompt
+    assert "returned, modified, or produced" in prompt
+    assert "validation, errors, or side effects" in prompt
+    assert "only behavior supported by the provided source code" in prompt
+    assert "without Markdown headings or bullet lists" in prompt
+
+
+def test_build_method_prompt_includes_owning_class():
+    method_info = FunctionInfo(
+        name="move",
+        start_line=2,
+        end_line=3,
+        parameters=["self", "position"],
+        docstring="Move the robot.",
+        class_name="RobotController",
+    )
+
+    prompt = build_function_prompt(
+        function_info=method_info,
+        source_code="def move(self, position):\n    self.position = position",
+        language="en",
+    )
+
+    assert "analyzing a method" in prompt
+    assert "Owning class:\nRobotController" in prompt
 
 
 # 验证类名、源码和目标语言能够正确进入 Class Prompt
@@ -54,12 +81,18 @@ def test_build_class_prompt():
     assert "def stop" in prompt
     assert "zh-CN" in prompt
     assert "overall responsibility" in prompt
+    assert "approximately 2-4 sentences" in prompt
+    assert "important state" in prompt
+    assert "key methods collectively do" in prompt
+    assert "directly supported by the source" in prompt
+    assert "without Markdown headings or bullet lists" in prompt
 
 
 # 验证文件路径、类、函数、方法和目标语言都能正确进入 File Prompt
 def test_build_file_prompt():
     file_info = FileInfo(
         path="repoatlas/core/parser.py",
+        module_docstring="Parse Python modules into structured symbol metadata.",
         classes=[
             ClassInfo(
                 name="PythonParser",
@@ -107,3 +140,12 @@ def test_build_file_prompt():
     assert "extract_function_info(node)" in prompt
     assert "PythonParser.parse(self, source)" in prompt
     assert "zh-CN" in prompt
+    assert "Parse Python modules into structured symbol metadata." in prompt
+    assert "Parse a Python file." in prompt
+    assert "approximately 3-5 sentences" in prompt
+    assert "primary responsibility" in prompt
+    assert "how those components work together" in prompt
+    assert "inputs, outputs, dependencies, or side effects" in prompt
+    assert "only when directly supported" in prompt
+    assert "do not merely restate its filename or list symbols" in prompt
+    assert "without Markdown headings or bullet lists" in prompt

@@ -146,7 +146,7 @@
           <button class="filter" data-filter="method" aria-pressed="true">Methods</button>
         </div>
       </div>
-      <div id="knowledge-canvas" tabindex="0" aria-label="Knowledge canvas. Drag to pan; use the zoom controls to change scale.">
+      <div id="knowledge-canvas" tabindex="0" aria-label="Knowledge canvas. Use the wheel or drag to pan; hold Control while using the wheel to zoom.">
         <div id="graph-stage"><svg id="connectors" aria-hidden="true"></svg><div id="knowledge-tree" aria-label="Repository nodes"></div></div>
         <p class="empty-state" id="empty-state" hidden>No Python files were detected.</p>
       </div>
@@ -386,6 +386,10 @@
       camera.x = x - (x - camera.x) * scale / camera.scale;
       camera.y = y - (y - camera.y) * scale / camera.scale; camera.scale = scale; applyCamera();
     }
+    function wheelDelta(event, value) {
+      const multiplier = event.deltaMode === 1 ? 18 : event.deltaMode === 2 ? canvas.clientHeight : 1;
+      return value * multiplier;
+    }
     function search() {
       query = $("repository-search").value.trim().toLowerCase();
       const results = $("search-results"); results.replaceChildren(); results.hidden = !query;
@@ -435,8 +439,19 @@
     });
     document.addEventListener("click", event => { if (!event.target.closest(".search-wrap")) $("search-results").hidden = true; });
     canvas.addEventListener("wheel", event => {
-      event.preventDefault(); const rect = canvas.getBoundingClientRect();
-      zoom(Math.exp(-event.deltaY * .0015), event.clientX - rect.left, event.clientY - rect.top);
+      event.preventDefault();
+      if (event.ctrlKey) {
+        const rect = canvas.getBoundingClientRect();
+        zoom(Math.exp(-wheelDelta(event, event.deltaY) * .0015), event.clientX - rect.left, event.clientY - rect.top);
+        return;
+      }
+      if (event.shiftKey) {
+        camera.x -= wheelDelta(event, event.deltaY || event.deltaX);
+      } else {
+        camera.x -= wheelDelta(event, event.deltaX);
+        camera.y -= wheelDelta(event, event.deltaY);
+      }
+      applyCamera();
     }, { passive: false });
     canvas.addEventListener("pointerdown", event => {
       if (event.button !== 0 || event.target.closest("button")) return;

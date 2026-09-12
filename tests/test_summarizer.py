@@ -68,6 +68,11 @@ def test_summarize_function_sends_correct_prompt():
     assert "file_path" in fake_llm.received_prompt
     assert "return file_path" in fake_llm.received_prompt
     assert "zh-CN" in fake_llm.received_prompt
+    assert "approximately 2-3 sentences" in fake_llm.received_prompt
+    assert "inputs are used" in fake_llm.received_prompt
+    assert "returned, modified, or produced" in fake_llm.received_prompt
+    assert "Do not invent functionality" in fake_llm.received_prompt
+    assert "without Markdown headings or bullet lists" in fake_llm.received_prompt
 
 
 # 模拟 Class Summary 使用的大模型
@@ -138,6 +143,9 @@ def test_summarize_class_sends_correct_prompt():
     assert "RobotController" in fake_llm.received_prompt
     assert "def move" in fake_llm.received_prompt
     assert "ja" in fake_llm.received_prompt
+    assert "approximately 2-4 sentences" in fake_llm.received_prompt
+    assert "important state" in fake_llm.received_prompt
+    assert "key methods collectively do" in fake_llm.received_prompt
 
 
 # 模拟 File Summary 使用的大模型
@@ -150,6 +158,7 @@ class FileFakeLLM:
 def test_summarize_file_returns_clean_summary():
     file_info = FileInfo(
         path="repoatlas/core/parser.py",
+        module_docstring="Parse Python modules into structured metadata.",
         classes=[],
         functions=[
             FunctionInfo(
@@ -186,6 +195,7 @@ class RecordingFileFakeLLM:
 def test_summarize_file_sends_correct_prompt():
     file_info = FileInfo(
         path="repoatlas/core/parser.py",
+        module_docstring="Parse Python modules into structured metadata.",
         classes=[],
         functions=[
             FunctionInfo(
@@ -211,6 +221,10 @@ def test_summarize_file_sends_correct_prompt():
     assert "repoatlas/core/parser.py" in fake_llm.received_prompt
     assert "parse_python_file(file_path)" in fake_llm.received_prompt
     assert "ja" in fake_llm.received_prompt
+    assert "Parse Python modules into structured metadata." in fake_llm.received_prompt
+    assert "approximately 3-5 sentences" in fake_llm.received_prompt
+    assert "how those components work together" in fake_llm.received_prompt
+    assert "dependencies, or side effects" in fake_llm.received_prompt
 
 
 from repoatlas.core.symbols import (
