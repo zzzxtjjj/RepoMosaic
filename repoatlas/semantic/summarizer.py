@@ -1,5 +1,4 @@
 from pathlib import Path
-import pytest
 from repoatlas.core.symbols import FunctionInfo, ClassInfo, FileInfo, RepositoryInfo
 from repoatlas.llm.base import LLMClient
 from repoatlas.semantic.prompts import build_function_prompt, build_class_prompt, build_file_prompt
