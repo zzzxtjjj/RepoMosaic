@@ -6,7 +6,7 @@ Human-first and agent-readable repository knowledge maps.
 
 RepoAtlas uses static analysis to turn a code repository into a browsable knowledge map. It extracts Python files, classes, functions, methods, signatures, line ranges, and docstrings, then presents that information as Markdown, Mermaid, JSON, and an interactive HTML map.
 
-Its optional semantic layer can generate multilingual responsibility summaries through an injected LLM client. The visual map accepts those summaries as input, while the current CLI remains static-analysis-only and never contacts a model provider.
+Static repository analysis runs locally. RepoAtlas can optionally generate multilingual semantic summaries through a user-configured LLM provider.
 
 ## Current Features
 
@@ -38,15 +38,23 @@ uv venv --python 3.12
 .\.venv\Scripts\Activate.ps1
 uv pip install -e ".[dev]"
 repoatlas .
+repoatlas . --no-llm
 ```
 
-You can also run the package without the installed console command:
+Both commands perform local static analysis. `--no-llm` explicitly disables model API calls, even if LLM options are also present.
+
+To opt into semantic summaries, configure your provider and run:
 
 ```powershell
-python -m repoatlas . --output-dir repoatlas_output
+$env:REPOATLAS_API_KEY = "<your-provider-api-key>"
+repoatlas . `
+  --provider openai-compatible `
+  --model your-model `
+  --base-url https://your-provider.example/v1 `
+  --lang en
 ```
 
-No API key is required for the CLI workflow. RepoAtlas V0.1 runs static analysis only unless application code explicitly invokes the semantic layer with an LLM client.
+`python -m repoatlas` accepts the same options as the installed `repoatlas` command. Supported summary languages are `zh-CN`, `en`, `ja`, `ko`, `de`, `it`, `pt`, and `es`.
 
 ## Example
 
@@ -105,9 +113,16 @@ SemanticSummary index
 Visualizer
 ```
 
+## Network and privacy
+
+Local static analysis does not call a model API. LLM summaries are opt-in and are enabled only when the provider, model, and base URL options are supplied without `--no-llm`.
+
+When LLM mode is enabled, RepoAtlas sends relevant source code and repository context to the configured provider. API credentials are read from `REPOATLAS_API_KEY`; never commit this variable or its value to the repository. RepoAtlas does not include API keys in `structure.json`, `map.html`, `STRUCTURE.md`, or other generated outputs.
+
+Before enabling LLM features for a private repository, review the selected provider's privacy, retention, and data-use policies.
+
 ## Roadmap
 
-- Opt-in CLI orchestration for semantic summaries
 - Import and dependency graphs
 - Task-aware file ranking
 - MCP integration
@@ -127,6 +142,6 @@ python -m pytest
 
 See `CONTRIBUTING.md` for the short contribution guide.
 
-## Security
+## License
 
-Never commit API keys to the repository. Applications using the optional LLM layer should obtain credentials from environment variables or local configuration. Tests use fake HTTP responses and must not contact real model APIs.
+RepoAtlas is licensed under the Apache License 2.0. See `LICENSE`.

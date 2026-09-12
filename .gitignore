@@ -7,3 +7,4 @@ build/
 dist/
 repoatlas_output/
 output/
+qwen_flash_test/
