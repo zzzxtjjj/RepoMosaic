@@ -1,5 +1,5 @@
 from pathlib import Path
-
+from repoatlas.llm.base import LLMError
 from repoatlas.cli import build_parser, main
 
 
@@ -168,3 +168,47 @@ def hello(name):
 
     # 验证 Fake LLM 返回的摘要最终真的进入 Visual Map 数据
     assert "FAKE SEMANTIC SUMMARY" in structure_content
+
+
+# 验证 LLM 调用失败时 CLI 返回干净错误，而不是抛出 traceback
+def test_cli_handles_llm_error(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    repo_dir = tmp_path / "sample_repo"
+    repo_dir.mkdir()
+
+    (repo_dir / "main.py").write_text(
+        """
+def hello():
+    return "hello"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    class FailingLLM:
+        def generate(self, prompt: str) -> str:
+            raise LLMError("LLM request timed out.")
+
+    monkeypatch.setattr(
+        "repoatlas.cli.create_llm_client",
+        lambda config: FailingLLM(),
+    )
+
+    exit_code = main(
+        [
+            str(repo_dir),
+            "--provider",
+            "openai-compatible",
+            "--model",
+            "fake-model",
+            "--base-url",
+            "https://fake.example.com",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "RepoAtlas error: LLM request timed out." in captured.err

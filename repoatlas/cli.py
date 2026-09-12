@@ -12,6 +12,7 @@ from repoatlas.semantic.languages import SUPPORTED_LANGUAGES
 from repoatlas.llm.config import LLMConfig
 from repoatlas.llm.factory import create_llm_client
 from repoatlas.semantic.summarizer import summarize_repository
+from repoatlas.llm.base import LLMError
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -153,11 +154,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             language=args.lang,
         )
 
-    except (FileNotFoundError, NotADirectoryError, OSError, SyntaxError) as error:
-        print(f"RepoAtlas error: {error}", file=sys.stderr)
+    except LLMError as error:
+        print(
+            f"RepoAtlas error: {error}",
+            file=sys.stderr,
+        )
+        return 1
+
+    except (
+        FileNotFoundError,
+        NotADirectoryError,
+        OSError,
+        SyntaxError,
+    ) as error:
+        print(
+            f"RepoAtlas error: {error}",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"Repository analyzed: {repository.root_path}")
+
     for output_path in generated.values():
         print(f"Generated: {output_path}")
+
     return 0

@@ -1,5 +1,5 @@
 import httpx
-
+from repoatlas.llm.base import LLMError
 from repoatlas.llm.config import LLMConfig
 
 
@@ -39,13 +39,67 @@ class OpenAICompatibleClient:
         }
 
         # 向模型服务发送 HTTP POST 请求
-        response = httpx.post(
-            url,
-            headers=headers,
-            json=payload,
-        )
+        try:
+            response = httpx.post(
+                url,
+                headers=headers,
+                json=payload,
+                timeout=30.0,
+            )
 
-        response.raise_for_status()
-        data = response.json()
-        
-        return data["choices"][0]["message"]["content"]
+            response.raise_for_status()
+
+        except httpx.TimeoutException as error:
+            raise LLMError(
+                "LLM request timed out."
+            ) from error
+
+        except httpx.HTTPStatusError as error:
+            status_code = error.response.status_code
+
+            if status_code in (401, 403):
+                raise LLMError(
+                    f"LLM authentication failed (HTTP {status_code})."
+                )
+
+            if status_code == 429:
+                raise LLMError(
+                    "LLM rate limit exceeded (HTTP 429)."
+                ) from error
+
+            if status_code >= 500:
+                raise LLMError(
+                    f"LLM service error (HTTP {status_code})."
+                ) from error
+            
+            raise LLMError(
+                f"LLM request failed (HTTP {status_code})."
+            ) from error
+
+        except httpx.RequestError as error:
+            raise LLMError(
+                "Could not connect to the LLM service."
+            ) from error
+
+        try:
+            data = response.json()
+
+        except ValueError as error:
+            raise LLMError(
+                "LLM returned an invalid JSON response."
+            ) from error
+
+        try:
+            content = data["choices"][0]["message"]["content"]
+
+        except (KeyError, IndexError, TypeError) as error:
+            raise LLMError(
+                "LLM returned an unexpected response format."
+            ) from error
+
+        if not isinstance(content, str):
+            raise LLMError(
+                "LLM returned an unexpected response format."
+            )
+
+        return content

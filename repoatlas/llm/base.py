@@ -1,6 +1,10 @@
 from typing import Protocol
 
 
+class LLMError(RuntimeError):
+    """表示 RepoAtlas 调用大模型服务时发生的可预期错误。"""
+
+
 class LLMClient(Protocol):
     """定义 RepoAtlas LLM 客户端需要实现的最小接口。"""
 
