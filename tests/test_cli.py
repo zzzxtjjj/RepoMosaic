@@ -2,9 +2,9 @@ from io import BytesIO, TextIOWrapper
 from pathlib import Path
 import sys
 import pytest
-from repoatlas.llm.base import LLMError
-from repoatlas.cli import build_parser, main
-from repoatlas.credentials import CredentialStoreError, ResolvedAPIKey
+from repomosaic.llm.base import LLMError
+from repomosaic.cli import build_parser, main
+from repomosaic.credentials import CredentialStoreError, ResolvedAPIKey
 
 
 # 模拟真实大模型客户端，避免测试过程中访问网络或消耗 API
@@ -23,7 +23,7 @@ def test_build_parser_defaults():
     args = parser.parse_args([])
 
     assert args.repo_path == "."
-    assert args.output_dir == "repoatlas_output"
+    assert args.output_dir == "repomosaic_output"
     assert args.no_llm is False
     assert args.provider is None
     assert args.model is None
@@ -96,7 +96,7 @@ def test_no_llm_overrides_llm_options(tmp_path: Path, monkeypatch):
         )
 
     monkeypatch.setattr(
-        "repoatlas.cli.create_llm_client",
+        "repomosaic.cli.create_llm_client",
         fail_if_called,
     )
 
@@ -132,12 +132,12 @@ def hello(name):
     )
 
     output_dir = tmp_path / "output"
-    monkeypatch.setenv("REPOATLAS_API_KEY", "test-key")
+    monkeypatch.setenv("REPOMOSAIC_API_KEY", "test-key")
 
     fake_llm = FakeLLM()
 
     monkeypatch.setattr(
-        "repoatlas.cli.create_llm_client",
+        "repomosaic.cli.create_llm_client",
         lambda config: fake_llm,
     )
 
@@ -195,9 +195,9 @@ def hello():
         def generate(self, prompt: str) -> str:
             raise LLMError("LLM request timed out.")
 
-    monkeypatch.setenv("REPOATLAS_API_KEY", "test-key")
+    monkeypatch.setenv("REPOMOSAIC_API_KEY", "test-key")
     monkeypatch.setattr(
-        "repoatlas.cli.create_llm_client",
+        "repomosaic.cli.create_llm_client",
         lambda config: FailingLLM(),
     )
 
@@ -216,7 +216,7 @@ def hello():
     captured = capsys.readouterr()
 
     assert exit_code == 1
-    assert "RepoAtlas error: LLM request timed out." in captured.err
+    assert "RepoMosaic error: LLM request timed out." in captured.err
 
 
 def test_cli_init_creates_config_in_current_directory(
@@ -224,20 +224,20 @@ def test_cli_init_creates_config_in_current_directory(
 ):
     monkeypatch.chdir(tmp_path)
     answers = iter(["  qwen-flash  ", "  https://example.test/v1  ", "2"])
-    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: True)
+    monkeypatch.setattr("repomosaic.cli._stdin_is_interactive", lambda: True)
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
 
     assert main(["init"]) == 0
 
     captured = capsys.readouterr()
-    content = (tmp_path / ".repoatlas.toml").read_text(encoding="utf-8")
+    content = (tmp_path / ".repomosaic.toml").read_text(encoding="utf-8")
     assert 'provider = "openai-compatible"' in content
     assert 'model = "qwen-flash"' in content
     assert 'base_url = "https://example.test/v1"' in content
     assert 'language = "zh-CN"' in content
     assert "api_key" not in content.casefold()
-    assert "Created .repoatlas.toml" in captured.out
-    assert "repoatlas auth set" in captured.out
+    assert "Created .repomosaic.toml" in captured.out
+    assert "repomosaic auth set" in captured.out
     assert "YOUR_API_KEY" not in captured.out
 
 
@@ -246,12 +246,12 @@ def test_cli_init_defaults_language_and_retries_invalid_answers(
 ):
     monkeypatch.chdir(tmp_path)
     answers = iter([" ", "model-a", "", "https://example.test", "9", "wrong", ""])
-    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: True)
+    monkeypatch.setattr("repomosaic.cli._stdin_is_interactive", lambda: True)
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
 
     assert main(["init"]) == 0
 
-    content = (tmp_path / ".repoatlas.toml").read_text(encoding="utf-8")
+    content = (tmp_path / ".repomosaic.toml").read_text(encoding="utf-8")
     captured = capsys.readouterr()
     assert 'language = "en"' in content
     assert "Model cannot be empty" in captured.out
@@ -261,42 +261,42 @@ def test_cli_init_defaults_language_and_retries_invalid_answers(
 
 def test_cli_init_noninteractive_recommends_template(tmp_path: Path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: False)
+    monkeypatch.setattr("repomosaic.cli._stdin_is_interactive", lambda: False)
 
     assert main(["init"]) == 2
 
     captured = capsys.readouterr()
     assert "interactive terminal" in captured.err
-    assert "repoatlas init --template" in captured.err
-    assert not (tmp_path / ".repoatlas.toml").exists()
+    assert "repomosaic init --template" in captured.err
+    assert not (tmp_path / ".repomosaic.toml").exists()
 
 
 def test_cli_init_template_and_force(tmp_path: Path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
 
     assert main(["init", "--template"]) == 0
-    config_path = tmp_path / ".repoatlas.toml"
+    config_path = tmp_path / ".repomosaic.toml"
     assert "# Supported values:" in config_path.read_text(encoding="utf-8")
 
     config_path.write_text("original\n", encoding="utf-8")
     assert main(["init", "--template"]) == 2
-    assert "repoatlas init --template --force" in capsys.readouterr().err
+    assert "repomosaic init --template --force" in capsys.readouterr().err
     assert config_path.read_text(encoding="utf-8") == "original\n"
 
     assert main(["init", "--template", "--force"]) == 0
     assert "# Supported values:" in config_path.read_text(encoding="utf-8")
     assert "original" not in config_path.read_text(encoding="utf-8")
-    assert "Created .repoatlas.toml" in capsys.readouterr().out
+    assert "Created .repomosaic.toml" in capsys.readouterr().out
 
 
 def test_cli_interactive_init_force_replaces_existing_config(
     tmp_path: Path, monkeypatch
 ):
     monkeypatch.chdir(tmp_path)
-    config_path = tmp_path / ".repoatlas.toml"
+    config_path = tmp_path / ".repomosaic.toml"
     config_path.write_text("original\n", encoding="utf-8")
     answers = iter(["replacement-model", "https://replacement.test", "3"])
-    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: True)
+    monkeypatch.setattr("repomosaic.cli._stdin_is_interactive", lambda: True)
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
 
     assert main(["init", "--force"]) == 0
@@ -310,7 +310,7 @@ def test_cli_interactive_init_force_replaces_existing_config(
 def test_cli_init_refuses_to_overwrite_existing_config(
     tmp_path: Path, monkeypatch, capsys
 ):
-    config_path = tmp_path / ".repoatlas.toml"
+    config_path = tmp_path / ".repomosaic.toml"
     config_path.write_text("original\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
 
@@ -323,12 +323,12 @@ def test_cli_init_refuses_to_overwrite_existing_config(
 
 def test_cli_auth_set_uses_hidden_input_and_never_prints_key(monkeypatch, capsys):
     saved = []
-    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: True)
+    monkeypatch.setattr("repomosaic.cli._stdin_is_interactive", lambda: True)
     monkeypatch.setattr(
-        "repoatlas.cli.getpass.getpass",
+        "repomosaic.cli.getpass.getpass",
         lambda prompt: "  test-hidden-key  ",
     )
-    monkeypatch.setattr("repoatlas.cli.set_stored_api_key", saved.append)
+    monkeypatch.setattr("repomosaic.cli.set_stored_api_key", saved.append)
 
     assert main(["auth", "set"]) == 0
 
@@ -341,9 +341,9 @@ def test_cli_auth_set_uses_hidden_input_and_never_prints_key(monkeypatch, capsys
 def test_cli_auth_set_retries_empty_input(monkeypatch, capsys):
     answers = iter([" ", "test-key"])
     saved = []
-    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: True)
-    monkeypatch.setattr("repoatlas.cli.getpass.getpass", lambda prompt: next(answers))
-    monkeypatch.setattr("repoatlas.cli.set_stored_api_key", saved.append)
+    monkeypatch.setattr("repomosaic.cli._stdin_is_interactive", lambda: True)
+    monkeypatch.setattr("repomosaic.cli.getpass.getpass", lambda prompt: next(answers))
+    monkeypatch.setattr("repomosaic.cli.set_stored_api_key", saved.append)
 
     assert main(["auth", "set"]) == 0
     assert saved == ["test-key"]
@@ -351,9 +351,9 @@ def test_cli_auth_set_retries_empty_input(monkeypatch, capsys):
 
 
 def test_cli_auth_set_rejects_noninteractive_input(monkeypatch, capsys):
-    monkeypatch.setattr("repoatlas.cli._stdin_is_interactive", lambda: False)
+    monkeypatch.setattr("repomosaic.cli._stdin_is_interactive", lambda: False)
     monkeypatch.setattr(
-        "repoatlas.cli.getpass.getpass",
+        "repomosaic.cli.getpass.getpass",
         lambda prompt: pytest.fail("hidden input should not be requested"),
     )
 
@@ -363,7 +363,7 @@ def test_cli_auth_set_rejects_noninteractive_input(monkeypatch, capsys):
 
 def test_cli_auth_status_reports_source_without_secret(monkeypatch, capsys):
     monkeypatch.setattr(
-        "repoatlas.cli.resolve_api_key",
+        "repomosaic.cli.resolve_api_key",
         lambda: ResolvedAPIKey("test-secret", "system credential store"),
     )
 
@@ -376,7 +376,7 @@ def test_cli_auth_status_reports_source_without_secret(monkeypatch, capsys):
 
 
 def test_cli_auth_status_reports_missing_key(monkeypatch, capsys):
-    monkeypatch.setattr("repoatlas.cli.resolve_api_key", lambda: None)
+    monkeypatch.setattr("repomosaic.cli.resolve_api_key", lambda: None)
 
     assert main(["auth", "status"]) == 0
     assert capsys.readouterr().out.strip() == "API key configured: no"
@@ -386,31 +386,31 @@ def test_cli_auth_backend_error_is_clean(monkeypatch, capsys):
     def fail():
         raise CredentialStoreError("Credential store unavailable.")
 
-    monkeypatch.setattr("repoatlas.cli.resolve_api_key", fail)
+    monkeypatch.setattr("repomosaic.cli.resolve_api_key", fail)
 
     assert main(["auth", "status"]) == 2
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err.strip() == (
-        "RepoAtlas error: Credential store unavailable."
+        "RepoMosaic error: Credential store unavailable."
     )
 
 
 def test_cli_auth_clear_handles_present_and_missing_key(monkeypatch, capsys):
-    monkeypatch.setattr("repoatlas.cli.clear_stored_api_key", lambda: True)
+    monkeypatch.setattr("repomosaic.cli.clear_stored_api_key", lambda: True)
     assert main(["auth", "clear"]) == 0
     assert "API key removed" in capsys.readouterr().out
 
-    monkeypatch.setattr("repoatlas.cli.clear_stored_api_key", lambda: False)
+    monkeypatch.setattr("repomosaic.cli.clear_stored_api_key", lambda: False)
     assert main(["auth", "clear"]) == 0
-    assert "No stored RepoAtlas API key found" in capsys.readouterr().out
+    assert "No stored RepoMosaic API key found" in capsys.readouterr().out
 
 
 def test_cli_llm_mode_reports_actionable_missing_key(tmp_path, monkeypatch, capsys):
     repo_dir = tmp_path / "sample_repo"
     repo_dir.mkdir()
     (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
-    monkeypatch.setattr("repoatlas.cli.resolve_api_key", lambda: None)
+    monkeypatch.setattr("repomosaic.cli.resolve_api_key", lambda: None)
 
     assert main(
         [
@@ -424,8 +424,8 @@ def test_cli_llm_mode_reports_actionable_missing_key(tmp_path, monkeypatch, caps
 
     error = capsys.readouterr().err
     assert "No API key configured" in error
-    assert "repoatlas auth set" in error
-    assert "REPOATLAS_API_KEY" in error
+    assert "repomosaic auth set" in error
+    assert "REPOMOSAIC_API_KEY" in error
 
 
 def test_cli_uses_config_and_cli_values_take_precedence(
@@ -434,7 +434,7 @@ def test_cli_uses_config_and_cli_values_take_precedence(
     repo_dir = tmp_path / "sample_repo"
     repo_dir.mkdir()
     (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
-    (tmp_path / ".repoatlas.toml").write_text(
+    (tmp_path / ".repomosaic.toml").write_text(
         """[llm]
 provider = "config-provider"
 model = "config-model"
@@ -444,7 +444,7 @@ language = "中文"
         encoding="utf-8",
     )
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("REPOATLAS_API_KEY", "test-key")
+    monkeypatch.setenv("REPOMOSAIC_API_KEY", "test-key")
     captured_config = None
     captured_language = None
 
@@ -458,8 +458,8 @@ language = "中文"
         captured_language = language
         return None
 
-    monkeypatch.setattr("repoatlas.cli.create_llm_client", capture_client)
-    monkeypatch.setattr("repoatlas.cli.summarize_repository", capture_summaries)
+    monkeypatch.setattr("repomosaic.cli.create_llm_client", capture_client)
+    monkeypatch.setattr("repomosaic.cli.summarize_repository", capture_summaries)
 
     exit_code = main(
         [
@@ -484,7 +484,7 @@ def test_cli_normalizes_language_alias_from_config(tmp_path: Path, monkeypatch):
     repo_dir = tmp_path / "sample_repo"
     repo_dir.mkdir()
     (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
-    (tmp_path / ".repoatlas.toml").write_text(
+    (tmp_path / ".repomosaic.toml").write_text(
         "[llm]\nlanguage = \"日本語\"\n",
         encoding="utf-8",
     )
@@ -496,7 +496,7 @@ def test_cli_normalizes_language_alias_from_config(tmp_path: Path, monkeypatch):
         captured_language = language
         return {}
 
-    monkeypatch.setattr("repoatlas.cli.render_visual_map", capture_render)
+    monkeypatch.setattr("repomosaic.cli.render_visual_map", capture_render)
 
     assert main([str(repo_dir), "--no-llm"]) == 0
     assert captured_language == "ja"
@@ -513,7 +513,7 @@ def test_cli_normalizes_canonical_language_unchanged(tmp_path: Path, monkeypatch
         captured_language = language
         return {}
 
-    monkeypatch.setattr("repoatlas.cli.render_visual_map", capture_render)
+    monkeypatch.setattr("repomosaic.cli.render_visual_map", capture_render)
 
     assert main([str(repo_dir), "--no-llm", "--lang", "zh-CN"]) == 0
     assert captured_language == "zh-CN"
@@ -532,7 +532,7 @@ def test_cli_rejects_unsupported_language_before_llm(
     def fail_if_called(config):
         raise AssertionError("unsupported language must not reach the LLM")
 
-    monkeypatch.setattr("repoatlas.cli.create_llm_client", fail_if_called)
+    monkeypatch.setattr("repomosaic.cli.create_llm_client", fail_if_called)
 
     exit_code = main(
         [
@@ -564,7 +564,7 @@ def test_cli_rejects_unsupported_config_language_before_llm(
     repo_dir = tmp_path / "sample_repo"
     repo_dir.mkdir()
     (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
-    (tmp_path / ".repoatlas.toml").write_text(
+    (tmp_path / ".repomosaic.toml").write_text(
         """[llm]
 model = "test-model"
 base_url = "https://example.test/v1"
@@ -577,7 +577,7 @@ language = "russian"
     def fail_if_called(config):
         raise AssertionError("unsupported config language must not reach the LLM")
 
-    monkeypatch.setattr("repoatlas.cli.create_llm_client", fail_if_called)
+    monkeypatch.setattr("repomosaic.cli.create_llm_client", fail_if_called)
 
     assert main([str(repo_dir)]) == 2
     assert "Unsupported language: russian" in capsys.readouterr().err
@@ -606,7 +606,7 @@ def test_no_llm_overrides_project_config(tmp_path: Path, monkeypatch):
     repo_dir = tmp_path / "sample_repo"
     repo_dir.mkdir()
     (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
-    (tmp_path / ".repoatlas.toml").write_text(
+    (tmp_path / ".repomosaic.toml").write_text(
         """[llm]
 provider = "config-provider"
 model = "config-model"
@@ -622,7 +622,7 @@ language = "zh-CN"
             "create_llm_client should not be called when --no-llm is enabled"
         )
 
-    monkeypatch.setattr("repoatlas.cli.create_llm_client", fail_if_called)
+    monkeypatch.setattr("repomosaic.cli.create_llm_client", fail_if_called)
 
     exit_code = main(
         [
@@ -643,7 +643,7 @@ def test_cli_default_provider_completes_explicit_llm_options(
     repo_dir.mkdir()
     (repo_dir / "main.py").write_text("value = 1\n", encoding="utf-8")
     captured_config = None
-    monkeypatch.setenv("REPOATLAS_API_KEY", "test-key")
+    monkeypatch.setenv("REPOMOSAIC_API_KEY", "test-key")
 
     def capture_client(config):
         nonlocal captured_config
@@ -651,7 +651,7 @@ def test_cli_default_provider_completes_explicit_llm_options(
         return FakeLLM()
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr("repoatlas.cli.create_llm_client", capture_client)
+    monkeypatch.setattr("repomosaic.cli.create_llm_client", capture_client)
 
     exit_code = main(
         [
@@ -681,8 +681,8 @@ def test_cli_reads_api_key_only_from_environment(tmp_path: Path, monkeypatch):
         return FakeLLM()
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("REPOATLAS_API_KEY", "environment-secret")
-    monkeypatch.setattr("repoatlas.cli.create_llm_client", capture_client)
+    monkeypatch.setenv("REPOMOSAIC_API_KEY", "environment-secret")
+    monkeypatch.setattr("repomosaic.cli.create_llm_client", capture_client)
 
     exit_code = main(
         [
@@ -713,12 +713,12 @@ def test_cli_uses_api_key_from_system_store(tmp_path: Path, monkeypatch):
         captured_config = config
         return FakeLLM()
 
-    monkeypatch.delenv("REPOATLAS_API_KEY", raising=False)
+    monkeypatch.delenv("REPOMOSAIC_API_KEY", raising=False)
     monkeypatch.setattr(
-        "repoatlas.cli.resolve_api_key",
+        "repomosaic.cli.resolve_api_key",
         lambda: ResolvedAPIKey("test-stored-key", "system credential store"),
     )
-    monkeypatch.setattr("repoatlas.cli.create_llm_client", capture_client)
+    monkeypatch.setattr("repomosaic.cli.create_llm_client", capture_client)
 
     assert main(
         [
@@ -745,7 +745,7 @@ def test_empty_init_config_does_not_enable_llm(tmp_path: Path, monkeypatch):
     def fail_if_called(config):
         raise AssertionError("an unfilled template must not enable LLM features")
 
-    monkeypatch.setattr("repoatlas.cli.create_llm_client", fail_if_called)
+    monkeypatch.setattr("repomosaic.cli.create_llm_client", fail_if_called)
 
     assert main(
         [

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-import repoatlas.mcp_server as mcp_server
+import repomosaic.mcp_server as mcp_server
 
 
 class FakeToolError(Exception):
@@ -55,7 +55,7 @@ def test_adapter_calls_agent_api_for_repository_structure(tmp_path, monkeypatch)
         lambda value: calls.append(("structure", value)) or expected,
     )
 
-    adapter = mcp_server.RepoAtlasMCPAdapter(tmp_path)
+    adapter = mcp_server.RepoMosaicMCPAdapter(tmp_path)
 
     assert adapter.get_repository_structure() == expected
     assert calls == [
@@ -77,7 +77,7 @@ def test_find_symbol_passes_filters_and_limit_to_agent_api(tmp_path, monkeypatch
         return expected
 
     monkeypatch.setattr(mcp_server.agent_api, "find_symbol", fake_find)
-    adapter = mcp_server.RepoAtlasMCPAdapter(tmp_path)
+    adapter = mcp_server.RepoMosaicMCPAdapter(tmp_path)
 
     result = adapter.find_symbol(
         "move",
@@ -111,7 +111,7 @@ def test_get_symbol_source_passes_structured_ref_to_agent_api(tmp_path, monkeypa
         return expected
 
     monkeypatch.setattr(mcp_server.agent_api, "get_symbol_source", fake_get_source)
-    adapter = mcp_server.RepoAtlasMCPAdapter(tmp_path)
+    adapter = mcp_server.RepoMosaicMCPAdapter(tmp_path)
 
     assert adapter.get_symbol_source(symbol) == expected
     assert captured == {
@@ -140,7 +140,7 @@ def test_server_registers_exactly_three_bound_repository_tools(
 def test_registered_tools_return_structured_data(tmp_path, fake_sdk, monkeypatch):
     expected = {"repository": "sample", "files": []}
     monkeypatch.setattr(
-        mcp_server.RepoAtlasMCPAdapter,
+        mcp_server.RepoMosaicMCPAdapter,
         "get_repository_structure",
         lambda self: expected,
     )
@@ -155,7 +155,7 @@ def test_expected_input_error_becomes_clean_tool_error(
     monkeypatch,
 ):
     monkeypatch.setattr(
-        mcp_server.RepoAtlasMCPAdapter,
+        mcp_server.RepoMosaicMCPAdapter,
         "find_symbol",
         lambda self, query, kind, path, limit: (_ for _ in ()).throw(
             ValueError(f"Invalid query under {self.repository_root}")
@@ -177,7 +177,7 @@ def test_unexpected_programming_error_is_not_hidden(
     monkeypatch,
 ):
     monkeypatch.setattr(
-        mcp_server.RepoAtlasMCPAdapter,
+        mcp_server.RepoMosaicMCPAdapter,
         "get_repository_structure",
         lambda self: (_ for _ in ()).throw(RuntimeError("programming bug")),
     )
@@ -214,7 +214,7 @@ def test_missing_optional_sdk_has_actionable_error(monkeypatch):
 
     with pytest.raises(
         mcp_server.MCPDependencyError,
-        match=r'pip install "repoatlas\[mcp\]"',
+        match=r'pip install "repomosaic\[mcp\]"',
     ):
         mcp_server._load_mcp_sdk()
 
@@ -229,7 +229,7 @@ def test_module_import_does_not_require_mcp_sdk():
 
 
 def test_main_runs_stdio_for_bound_repository(tmp_path, monkeypatch):
-    server = FakeMCPServer("RepoAtlas")
+    server = FakeMCPServer("RepoMosaic")
     captured = {}
 
     def fake_create(path):

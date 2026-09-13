@@ -1,4 +1,4 @@
-# RepoAtlas Core V0.1 stabilization audit
+# RepoMosaic Core V0.1 stabilization audit
 
 审计日期：2026-09-12。范围：当前工作区（含尚未提交的 module docstring 和画布修改）。
 
@@ -11,8 +11,8 @@
 ## 2. Test result and evidence
 
 - python -m pytest：55 passed in 0.29s（Windows，Python 3.12）。
-- python -m repoatlas --help：成功，包含 provider/model/base-url/lang/no-llm。
-- python -m repoatlas examples/sample_repo --no-llm：成功，生成 repoatlas_output 下三个文件。
+- python -m repomosaic --help：成功，包含 provider/model/base-url/lang/no-llm。
+- python -m repomosaic examples/sample_repo --no-llm：成功，生成 repomosaic_output 下三个文件。
 - 额外离线探针：13 种网络/响应失败、unsupported provider、复杂参数、UTF-8 BOM、工作目录改变、越界 FileInfo、非法语言、Fake LLM 中英文/密钥流、wheel/sdist 构建及解包运行。
 - Fake LLM CLI 对示例仓库发送 10 次请求；zh-CN 传入所有 prompt；有模块 docstring 的文件仍生成摘要；测试密钥只传入客户端配置，没有出现在三个输出文件。
 - 本次未运行 Linux/macOS，未启动 VS Code，未向真实服务发送请求。Windows 创建符号链接的诊断夹具受到系统限制，相关风险来自代码检查，不冒充已完成的符号链接运行测试。
@@ -29,7 +29,7 @@
 
 ### P1-1：LLM 失败越过 CLI 异常边界
 
-- 文件：repoatlas/llm/openai_compatible.py:42；repoatlas/cli.py:156。
+- 文件：repomosaic/llm/openai_compatible.py:42；repomosaic/cli.py:156。
 - 问题：CLI 只捕获文件系统和 SyntaxError；网络异常与响应验证异常不在处理范围。离线复现 connection→ConnectError、timeout→ReadTimeout，400/401/403/404/429/500/503→HTTPStatusError，非法 JSON→JSONDecodeError，缺失 choices→KeyError，空 choices→IndexError，content=null→后续 strip 的 AttributeError。命令行入口会显示 traceback。
 - 影响：预期的服务故障被当作程序崩溃；MCP 难以提供稳定错误；仓库处理中途失败丢弃本轮内存摘要。HTTP 错误信息可能带 URL，不能直接把含用户信息或 query 的 URL 原样交给用户。
 - 最小建议：客户端明确 timeout，验证 choices/message/content，统一为一个简单 LLMError（或清楚约定的异常类型）；CLI 只捕获该异常，输出经过脱敏的状态分类并返回 1。配置错误仍返回 2。保留异常链供内部调试，但不向终端输出响应全文、Authorization 或带凭据 URL。不添加复杂错误框架或无限重试。
@@ -37,7 +37,7 @@
 
 ### P1-2：路径身份依赖进程当前目录，缺少文件边界契约
 
-- 文件：repoatlas/core/analyzer.py:10、33；repoatlas/core/scanner.py:31；repoatlas/semantic/summarizer.py:59、74；repoatlas/rendering/visualizer.py:44。
+- 文件：repomosaic/core/analyzer.py:10、33；repomosaic/core/scanner.py:31；repomosaic/semantic/summarizer.py:59、74；repomosaic/rendering/visualizer.py:44。
 - 问题：analyze_repository 保存传入的相对 root_path。分析 examples/sample_repo 后改变 cwd，再序列化，实际复现所有文件 source 为空；summarizer 则会读文件失败。FileInfo.path 也未经越界验证：手动传入 ../outside.py 可读取根目录外源码。scanner 未对文件符号链接的 resolved target 检查 containment。
 - 影响：长生命周期 MCP 调用不能可靠复用模型；若未来适配器接受不可信模型或扫描含外部链接的仓库，会越过授权仓库边界。当前尚无 MCP，不把这一风险表述为已经发生的远程漏洞。
 - 最小建议：analyze_repository 入口 expanduser().resolve() 后保存绝对 POSIX root；约定 FileInfo.path 必须是仓库相对路径；实际读取前 resolve 并验证位于根内，明确外部链接拒绝/跳过策略。MCP 还应限制允许的仓库根。不要仅做字符串前缀判断。
@@ -45,7 +45,7 @@
 
 ### P1-3：合法函数参数静默遗漏
 
-- 文件：repoatlas/core/parser.py:44–50。
+- 文件：repomosaic/core/parser.py:44–50。
 - 问题：仅提取 node.args.args。对 def f(a, /, b=1, *args, flag=True, **kwargs)，实际输出 parameters=['b']、签名 f(b)。
 - 影响：返回结构看似完整却缺失真实输入；未来 agent 用它定位或理解函数会得到错误信息。这是当前参数提取功能的正确性缺口，不是要求完整 Python 语义分析。
 - 最小建议：至少覆盖 posonlyargs、args、vararg、kwonlyargs、kwarg 并按源码顺序处理，明确 parameters 字段究竟保存参数名还是可展示签名片段；不必本轮增加复杂模型。默认值和注解的完整重建可继续延后。
@@ -53,7 +53,7 @@
 
 ### P1-4：库级语义 API 不执行语言校验
 
-- 文件：repoatlas/semantic/summarizer.py:9、23、37、67；repoatlas/semantic/languages.py:15。
+- 文件：repomosaic/semantic/summarizer.py:9、23、37、67；repomosaic/semantic/languages.py:15。
 - 问题：validate_language 存在，但 summarizer 未调用。CLI argparse 可限制八种语言，直接调用 summarize_repository(..., 'invalid-language', fake) 却成功发送了 10 次请求并保存非法语言。
 - 影响：MCP 复用时不能依赖 CLI 校验，无效输入会消耗模型请求。
 - 最小建议：在公开 summarizer 入口复用现有 validate_language，保证调用模型前失败；空仓库同样应验证。索引规则和 SemanticSummary 不必更改。
@@ -64,20 +64,20 @@
 - 文件：README.md:9、49、110；pyproject.toml；项目根（无 LICENSE 文件）。
 - 问题：README 仍声称 CLI 永不调用模型，并把 opt-in CLI orchestration 列为 roadmap，当前 CLI 已实际支持该流程。仓库未提供许可证文件或对应包元数据。
 - 影响：用户无法准确判断何时源码会发送给模型提供方；开源发布前的许可选择也尚未明确。
-- 最小建议：说明默认静态、完整 LLM 参数显式开启、no-llm 优先、REPOATLAS_API_KEY 用途、发送的源码/符号内容、费用与输出隐私；由项目所有者选择许可证后加入文件与元数据。审计不替所有者选择许可证。
+- 最小建议：说明默认静态、完整 LLM 参数显式开启、no-llm 优先、REPOMOSAIC_API_KEY 用途、发送的源码/符号内容、费用与输出隐私；由项目所有者选择许可证后加入文件与元数据。审计不替所有者选择许可证。
 - 需要验证：文档示例与 --help 一致；新构建包含所选许可证。
 
 ### P1-6：默认输出目录内 Markdown 源码链接指向错误位置
 
-- 文件：repoatlas/rendering/renderer.py:39–52；repoatlas/rendering/visualizer.py:280。
-- 问题：STRUCTURE.md 位于 repoatlas_output/，链接仍按仓库根生成 robot.py 或 repoatlas/core/parser.py，浏览器会相对输出目录寻找源码。示例输出内 robot.py 不存在，已核验。
+- 文件：repomosaic/rendering/renderer.py:39–52；repomosaic/rendering/visualizer.py:280。
+- 问题：STRUCTURE.md 位于 repomosaic_output/，链接仍按仓库根生成 robot.py 或 repomosaic/core/parser.py，浏览器会相对输出目录寻找源码。示例输出内 robot.py 不存在，已核验。
 - 影响：公开输出中承诺的源码导航在默认 CLI 路径下不可用；空格、括号等路径也没有 URL/Markdown 转义。
 - 最小建议：保留独立 renderer 原 API，通过可选 link-base 或导出上下文把源码路径转换为相对 Markdown 文件的位置，并编码路径。对输出在另一磁盘/仓库外的场景明确 fallback。
 - 需要回归：默认 output 子目录、任意输出目录、Windows 跨盘、空格/括号路径。
 
 ## 5. P2 — desirable improvement
 
-- qwen_flash_test/ 未忽略：本轮已做唯一安全修复，加入 .gitignore。目录未 tracked，内容未删除。output/、repoatlas_output/、缓存和 egg-info 已忽略且无 tracked 产物。
+- qwen_flash_test/ 未忽略：本轮已做唯一安全修复，加入 .gitignore。目录未 tracked，内容未删除。output/、repomosaic_output/、缓存和 egg-info 已忽略且无 tracked 产物。
 - UTF-8 BOM：合法 BOM Python 文件在当前 read_text('utf-8')→ast.parse 流程抛 SyntaxError。PEP 263 非 UTF-8 源码可能抛未捕获 UnicodeDecodeError。建议后续统一采用 Python 源码编码读取方式，同时用于 semantic 源码提取；UTF-8 无 BOM 与 Unicode docstring 正常。
 - 文件 prompt 缺少已存在的 module_docstring，也没有源码或顶层赋值/副作用信息；无符号文件仅给路径和 None，证据很弱。建议加入模块文档或受限源码证据，同时继续生成 LLM 摘要，不把 docstring 当作摘要替代品。
 - extract_source_lines 不验证 1 <= start <= end <= 文件行数；切片对越界/负数静默处理。使用 parser 当次结果时通常有效，但文件修改或外部构造模型时需明确错误。
@@ -111,13 +111,13 @@
 
 目前 MCP 可使用公开模块级函数，无需调用 _serialize_*、_lookup_summary 等私有 helper：
 
-- repoatlas.core.analyzer.analyze_repository
-- repoatlas.core.symbols：RepositoryInfo / FileInfo / ClassInfo / FunctionInfo
-- repoatlas.semantic.summarizer.summarize_repository
-- repoatlas.semantic.models.SemanticSummary
-- repoatlas.semantic.index：make_summary_key / build_summary_index
-- repoatlas.llm：LLMClient / LLMConfig / create_llm_client
-- repoatlas.rendering.visualizer：repository_to_dict / export_repository_json / render_visual_map
+- repomosaic.core.analyzer.analyze_repository
+- repomosaic.core.symbols：RepositoryInfo / FileInfo / ClassInfo / FunctionInfo
+- repomosaic.semantic.summarizer.summarize_repository
+- repomosaic.semantic.models.SemanticSummary
+- repomosaic.semantic.index：make_summary_key / build_summary_index
+- repomosaic.llm：LLMClient / LLMConfig / create_llm_client
+- repomosaic.rendering.visualizer：repository_to_dict / export_repository_json / render_visual_map
 
 最小后续 API 整理：文档化并可在 core/__init__.py、semantic/__init__.py 做少量 re-export；无需 facade 或依赖注入框架。冻结前应约定绝对 root、相对 file path、行号含端点、语言与异常规则。
 
@@ -133,11 +133,11 @@ visualizer API 的 summaries=None/lang 参数继续兼容；但输出含完整 s
 
 ## 10. Packaging / PyPI risks
 
-在临时源码副本使用本机 setuptools backend 实际构建 wheel 和 sdist；两者均含 repoatlas/rendering/templates/map.html。wheel 中未发现 output/qwen/.pyc；解包后强制从该路径 import（已校验 __file__），成功生成三个输出并运行 --version=0.1.0。
+在临时源码副本使用本机 setuptools backend 实际构建 wheel 和 sdist；两者均含 repomosaic/rendering/templates/map.html。wheel 中未发现 output/qwen/.pyc；解包后强制从该路径 import（已校验 __file__），成功生成三个输出并运行 --version=0.1.0。
 
 这是本机后端构建与解包运行检查，不是干净网络隔离安装或 PyPI 发布演练；依赖使用本机已安装版本。构建临时副本只包含包、README、pyproject，因此不据此宣称全部 sdist 非包文件清单已审计。
 
-requires-python >=3.11、httpx>=0.27、pytest dev extra、repoatlas.cli:main、动态 __version__、testpaths 均一致。没有发现严重打包故障。冻结前处理 P1-5；CI 加一次构建/安装 wheel 并从 checkout 外运行的 smoke test，可防止 editable install 掩盖模板遗漏。
+requires-python >=3.11、httpx>=0.27、pytest dev extra、repomosaic.cli:main、动态 __version__、testpaths 均一致。没有发现严重打包故障。冻结前处理 P1-5；CI 加一次构建/安装 wheel 并从 checkout 外运行的 smoke test，可防止 editable install 掩盖模板遗漏。
 
 ## 11. Cross-platform risks
 
@@ -149,7 +149,7 @@ requires-python >=3.11、httpx>=0.27、pytest dev extra、repoatlas.cli:main、�
 
 ## 12. Security / privacy result
 
-对 repoatlas/tests/examples 及当前 output/repoatlas_output/qwen_flash_test 中 51 个文本文件进行不打印匹配值的常见凭据模式检查，未命中疑似真实凭据。测试 test-key 为 mock。未读取或输出当前真实 REPOATLAS_API_KEY，未扫描 Git 历史、虚拟环境或任意二进制；不能保证不存在非标准形态的 secret/个人信息。
+对 repomosaic/tests/examples 及当前 output/repomosaic_output/qwen_flash_test 中 51 个文本文件进行不打印匹配值的常见凭据模式检查，未命中疑似真实凭据。测试 test-key 为 mock。未读取或输出当前真实 REPOMOSAIC_API_KEY，未扫描 Git 历史、虚拟环境或任意二进制；不能保证不存在非标准形态的 secret/个人信息。
 
 另外使用临时 mock 环境变量验证 CLI：配置收到测试 key，JSON/HTML/Markdown 均没有该 sentinel。现有三类输出 JSON 结构没有 api_key/llm_config/Authorization 字段。
 
@@ -174,7 +174,7 @@ JSON 写入已经统一为 _write_json。未见残留调试 print；CLI print �
 
 ## 15. Recommended tasks AFTER MCP
 
-当前请求数严格为 F + C + U + M：每文件、每类、每普通函数、每方法各一次。示例仓库为 3+1+3+3=10；当前 RepoAtlas 为 38+18+107+21=184。没有执行这些真实请求。
+当前请求数严格为 F + C + U + M：每文件、每类、每普通函数、每方法各一次。示例仓库为 3+1+3+3=10；当前 RepoMosaic 为 38+18+107+21=184。没有执行这些真实请求。
 
 按单次平均 1–3 秒估算，184 次串行约 3.1–9.2 分钟；5–10 秒约 15.3–30.7 分钟。这是情景估算，不是实测速度或费用。大类源码包含方法，方法又单独发送；固定 prompt 重复；每符号源码提取都再次读取整个文件。每次重跑重新付费，任何中途异常都会终止当前流程，先前完成的内存摘要没有持久化。
 

@@ -1,6 +1,6 @@
-from repoatlas.core.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
-import repoatlas.rendering.renderer as renderer_module
-from repoatlas.rendering.renderer import (
+from repomosaic.core.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
+import repomosaic.rendering.renderer as renderer_module
+from repomosaic.rendering.renderer import (
     build_source_link,
     render_mindmap,
     render_structure_markdown,
@@ -14,7 +14,7 @@ def make_repository() -> RepositoryInfo:
         root_path="/projects/sample",
         files=[
             FileInfo(
-                path="repoatlas/parser.py",
+                path="repomosaic/parser.py",
                 classes=[
                     ClassInfo(
                         name="Robot",
@@ -67,7 +67,7 @@ def test_render_mindmap_contains_repository_symbols_and_lines():
 
     assert "mindmap" in result
     assert "Repository" in result
-    assert "repoatlas/parser.py" in result
+    assert "repomosaic/parser.py" in result
     assert "parse_python_file(file_path)" in result
     assert "Robot" in result
     assert "move(position, speed)" in result
@@ -82,22 +82,22 @@ def test_render_structure_markdown_is_complete_and_linked():
 
     assert result.startswith("# Repository Knowledge Map")
     assert "```mermaid" in result
-    assert "## [repoatlas/parser.py](repoatlas/parser.py)" in result
+    assert "## [repomosaic/parser.py](repomosaic/parser.py)" in result
     assert "\n##\n" not in result
     assert "Symbols: 1 class · 2 functions · 2 methods" in result
     assert "Detected" not in result
     assert "### Classes" in result
     assert (
-        "#### [Robot](repoatlas/parser.py#L10-L50) · L10–L50"
+        "#### [Robot](repomosaic/parser.py#L10-L50) · L10–L50"
         in result
     )
     assert "\n####\n" not in result
-    assert "[move(position, speed)](repoatlas/parser.py#L20-L35)" in result
-    assert "[stop()](repoatlas/parser.py#L37-L42)" in result
+    assert "[move(position, speed)](repomosaic/parser.py#L20-L35)" in result
+    assert "[stop()](repomosaic/parser.py#L37-L42)" in result
     assert "### Functions" in result
-    assert "[parse_python_file(file_path)](repoatlas/parser.py#L60-L110)" in result
+    assert "[parse_python_file(file_path)](repomosaic/parser.py#L60-L110)" in result
     assert (
-        "[extract_function_info(node)](repoatlas/parser.py#L113-L126)"
+        "[extract_function_info(node)](repomosaic/parser.py#L113-L126)"
         in result
     )
     assert "Parse a Python file." in result
@@ -129,11 +129,11 @@ def test_every_class_has_heading_before_docstring_and_methods():
     markdown = render_structure_markdown(repository)
 
     robot_section = (
-        "#### [Robot](repoatlas/parser.py#L10-L50) · L10–L50\n\n"
+        "#### [Robot](repomosaic/parser.py#L10-L50) · L10–L50\n\n"
         "Control the robot.\n\nMethods:"
     )
     controller_section = (
-        "#### [Controller](repoatlas/parser.py#L52-L58) · L52–L58\n\n"
+        "#### [Controller](repomosaic/parser.py#L52-L58) · L52–L58\n\n"
         "Coordinate robot actions.\n\nMethods:"
     )
     assert robot_section in markdown
@@ -160,7 +160,7 @@ def test_build_source_link_relative_to_output_directory(tmp_path):
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
 
-    source_dir = repo_dir / "repoatlas" / "core"
+    source_dir = repo_dir / "repomosaic" / "core"
     source_dir.mkdir(parents=True)
 
     source_file = source_dir / "parser.py"
@@ -169,16 +169,16 @@ def test_build_source_link_relative_to_output_directory(tmp_path):
         encoding="utf-8",
     )
 
-    output_dir = repo_dir / "repoatlas_output"
+    output_dir = repo_dir / "repomosaic_output"
     output_dir.mkdir()
 
     link = build_source_link(
         repository_root=repo_dir,
-        file_path="repoatlas/core/parser.py",
+        file_path="repomosaic/core/parser.py",
         output_dir=output_dir,
     )
 
-    assert link == "../repoatlas/core/parser.py"
+    assert link == "../repomosaic/core/parser.py"
 
 
 # 验证输出目录嵌套更深时，源码链接仍能正确回到仓库文件

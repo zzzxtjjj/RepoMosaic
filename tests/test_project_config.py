@@ -2,14 +2,18 @@ from pathlib import Path
 
 import pytest
 
-from repoatlas.project_config import (
+from repomosaic.project_config import (
     CONFIG_FILENAME,
     ProjectConfigError,
     load_project_config,
     write_project_config,
     write_project_config_values,
 )
-from repoatlas.semantic.languages import SUPPORTED_LANGUAGES
+from repomosaic.semantic.languages import SUPPORTED_LANGUAGES
+
+
+def test_config_uses_repomosaic_filename():
+    assert CONFIG_FILENAME == ".repomosaic.toml"
 
 
 def test_init_template_excludes_api_key(tmp_path: Path):
@@ -106,5 +110,5 @@ def test_config_rejects_api_key(tmp_path: Path):
         encoding="utf-8",
     )
 
-    with pytest.raises(ProjectConfigError, match="REPOATLAS_API_KEY"):
+    with pytest.raises(ProjectConfigError, match="REPOMOSAIC_API_KEY"):
         load_project_config(tmp_path)

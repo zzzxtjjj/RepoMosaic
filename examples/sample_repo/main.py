@@ -1,4 +1,4 @@
-"""Sample RepoAtlas target repository."""
+"""Sample RepoMosaic target repository."""
 
 from robot import RobotController
 from utils import load_config

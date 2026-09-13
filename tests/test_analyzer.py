@@ -1,4 +1,4 @@
-from repoatlas.core.analyzer import analyze_repository
+from repomosaic.core.analyzer import analyze_repository
 from pathlib import Path
 
 

@@ -1,9 +1,9 @@
 import httpx
 import pytest
 
-from repoatlas.llm.base import LLMError
-from repoatlas.llm.config import LLMConfig
-from repoatlas.llm.openai_compatible import OpenAICompatibleClient
+from repomosaic.llm.base import LLMError
+from repomosaic.llm.config import LLMConfig
+from repomosaic.llm.openai_compatible import OpenAICompatibleClient
 
 
 # 模拟 HTTP 响应对象，避免测试时真的调用大模型 API
@@ -30,7 +30,7 @@ def test_generate_returns_model_text(monkeypatch):
     captured_request = {}
 
 
-    # 模拟 httpx.post，并记录 RepoAtlas 实际发送的请求
+    # 模拟 httpx.post，并记录 RepoMosaic 实际发送的请求
     def fake_post(url, headers, json, timeout):
         captured_request["url"] = url
         captured_request["headers"] = headers
@@ -38,7 +38,7 @@ def test_generate_returns_model_text(monkeypatch):
         return FakeResponse()
 
     monkeypatch.setattr(
-        "repoatlas.llm.openai_compatible.httpx.post",
+        "repomosaic.llm.openai_compatible.httpx.post",
         fake_post,
     )
 
@@ -73,7 +73,7 @@ def test_generate_without_api_key(monkeypatch):
         return FakeResponse()
 
     monkeypatch.setattr(
-        "repoatlas.llm.openai_compatible.httpx.post",
+        "repomosaic.llm.openai_compatible.httpx.post",
         fake_post,
     )
 
@@ -117,7 +117,7 @@ def make_test_client() -> OpenAICompatibleClient:
     return OpenAICompatibleClient(config)
 
 
-# 验证 LLM 请求超时时，会转换成 RepoAtlas 自己的 LLMError
+# 验证 LLM 请求超时时，会转换成 RepoMosaic 自己的 LLMError
 def test_generate_handles_timeout(monkeypatch):
     client = make_test_client()
 
@@ -156,7 +156,7 @@ def test_generate_handles_authentication_error(monkeypatch):
         client.generate("hello")
 
 
-# 验证 API 触发限流时，会返回明确的 RepoAtlas 错误
+# 验证 API 触发限流时，会返回明确的 RepoMosaic 错误
 def test_generate_handles_rate_limit(monkeypatch):
     client = make_test_client()
 
@@ -196,7 +196,7 @@ def test_generate_handles_server_error(monkeypatch):
         client.generate("hello")
 
 
-# 验证网络连接失败时，会转换成清晰的 RepoAtlas 错误
+# 验证网络连接失败时，会转换成清晰的 RepoMosaic 错误
 def test_generate_handles_connection_error(monkeypatch):
     client = make_test_client()
 

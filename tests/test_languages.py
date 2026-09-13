@@ -1,13 +1,13 @@
 import pytest
 
-from repoatlas.semantic.languages import (
+from repomosaic.semantic.languages import (
     SUPPORTED_LANGUAGES,
     normalize_language,
     validate_language,
 )
 
 
-# 验证 RepoAtlas V0.1 支持预定的八种自然语言
+# 验证 RepoMosaic V0.1 支持预定的八种自然语言
 def test_supported_languages():
     assert set(SUPPORTED_LANGUAGES) == {
         "zh-CN",

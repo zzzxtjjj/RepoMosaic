@@ -1,5 +1,5 @@
-from repoatlas.core.symbols import FunctionInfo, ClassInfo, FileInfo
-from repoatlas.semantic.prompts import build_function_prompt, build_class_prompt, build_file_prompt
+from repomosaic.core.symbols import FunctionInfo, ClassInfo, FileInfo
+from repomosaic.semantic.prompts import build_function_prompt, build_class_prompt, build_file_prompt
 
 
 # 验证函数信息、源码和语言能够正确进入 Prompt
@@ -91,7 +91,7 @@ def test_build_class_prompt():
 # 验证文件路径、类、函数、方法和目标语言都能正确进入 File Prompt
 def test_build_file_prompt():
     file_info = FileInfo(
-        path="repoatlas/core/parser.py",
+        path="repomosaic/core/parser.py",
         module_docstring="Parse Python modules into structured symbol metadata.",
         classes=[
             ClassInfo(
@@ -134,7 +134,7 @@ def test_build_file_prompt():
         language="zh-CN",
     )
 
-    assert "repoatlas/core/parser.py" in prompt
+    assert "repomosaic/core/parser.py" in prompt
     assert "PythonParser" in prompt
     assert "parse_python_file(file_path)" in prompt
     assert "extract_function_info(node)" in prompt

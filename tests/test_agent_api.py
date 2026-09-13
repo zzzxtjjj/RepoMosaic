@@ -1,11 +1,11 @@
-from repoatlas.agent_api import (
+from repomosaic.agent_api import (
     _serialize_symbol,
     find_symbol,
     get_repository_structure,
     get_symbol_source,
 )
-from repoatlas.core.analyzer import analyze_repository
-from repoatlas.core.symbols import (
+from repomosaic.core.analyzer import analyze_repository
+from repomosaic.core.symbols import (
     ClassInfo,
     FileInfo,
     FunctionInfo,

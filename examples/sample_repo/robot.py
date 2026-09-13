@@ -1,4 +1,4 @@
-"""Small robot controller used in RepoAtlas demonstrations."""
+"""Small robot controller used in RepoMosaic demonstrations."""
 
 
 class RobotController:

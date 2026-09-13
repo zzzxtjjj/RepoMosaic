@@ -2,14 +2,14 @@ import json
 
 import pytest
 
-from repoatlas.core.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
-from repoatlas.rendering.visualizer import (
+from repomosaic.core.symbols import ClassInfo, FileInfo, FunctionInfo, RepositoryInfo
+from repomosaic.rendering.visualizer import (
     build_vscode_uri,
     export_repository_json,
     render_visual_map,
     repository_to_dict,
 )
-from repoatlas.semantic.models import SemanticSummary
+from repomosaic.semantic.models import SemanticSummary
 
 
 def make_repository() -> RepositoryInfo:
@@ -18,7 +18,7 @@ def make_repository() -> RepositoryInfo:
         root_path="/projects/sample",
         files=[
             FileInfo(
-                path="repoatlas/robot.py",
+                path="repomosaic/robot.py",
                 classes=[
                     ClassInfo(
                         name="Robot",
@@ -56,21 +56,21 @@ def make_summaries() -> list[SemanticSummary]:
     return [
         SemanticSummary(
             target_type="file",
-            file_path="repoatlas/robot.py",
-            name="repoatlas/robot.py",
+            file_path="repomosaic/robot.py",
+            name="repomosaic/robot.py",
             summary="Defines the robot model and factory.",
             language="en",
         ),
         SemanticSummary(
             target_type="file",
-            file_path="repoatlas/robot.py",
-            name="repoatlas/robot.py",
+            file_path="repomosaic/robot.py",
+            name="repomosaic/robot.py",
             summary="定义机器人模型和工厂函数。",
             language="zh-CN",
         ),
         SemanticSummary(
             target_type="class",
-            file_path="repoatlas/robot.py",
+            file_path="repomosaic/robot.py",
             name="Robot",
             start_line=5,
             summary="Represents a controllable robot.",
@@ -78,7 +78,7 @@ def make_summaries() -> list[SemanticSummary]:
         ),
         SemanticSummary(
             target_type="function",
-            file_path="repoatlas/robot.py",
+            file_path="repomosaic/robot.py",
             name="create_robot",
             start_line=33,
             summary="Builds a robot from configuration.",
@@ -86,7 +86,7 @@ def make_summaries() -> list[SemanticSummary]:
         ),
         SemanticSummary(
             target_type="function",
-            file_path="repoatlas/robot.py",
+            file_path="repomosaic/robot.py",
             name="create_robot",
             start_line=33,
             summary="根据配置创建机器人。",
@@ -94,7 +94,7 @@ def make_summaries() -> list[SemanticSummary]:
         ),
         SemanticSummary(
             target_type="method",
-            file_path="repoatlas/robot.py",
+            file_path="repomosaic/robot.py",
             name="move",
             start_line=10,
             class_name="Robot",
@@ -103,7 +103,7 @@ def make_summaries() -> list[SemanticSummary]:
         ),
         SemanticSummary(
             target_type="method",
-            file_path="repoatlas/robot.py",
+            file_path="repomosaic/robot.py",
             name="move",
             start_line=10,
             class_name="OtherRobot",
@@ -123,7 +123,7 @@ def test_export_repository_json_contains_complete_structure(tmp_path):
     assert data["type"] == "repository"
     assert data["name"] == "sample"
     assert data["root_path"] == "/projects/sample"
-    assert data["files"][0]["path"] == "repoatlas/robot.py"
+    assert data["files"][0]["path"] == "repomosaic/robot.py"
     assert data["files"][0]["classes"][0]["name"] == "Robot"
     assert data["files"][0]["functions"][0]["name"] == "create_robot"
     assert data["files"][0]["functions"][0]["parameters"] == ["config"]
@@ -151,9 +151,9 @@ def test_map_html_contains_repository_and_interactive_nodes(tmp_path):
 
     html = paths["html"].read_text(encoding="utf-8")
 
-    assert "sample · RepoAtlas" in html
+    assert "sample · RepoMosaic" in html
     assert '"root_path": "/projects/sample"' in html
-    assert '"path": "repoatlas/robot.py"' in html
+    assert '"path": "repomosaic/robot.py"' in html
     assert '"name": "Robot"' in html
     assert '"name": "create_robot"' in html
     assert '"name": "move"' in html
@@ -171,13 +171,13 @@ def test_map_html_contains_repository_and_interactive_nodes(tmp_path):
 
 def test_only_file_nodes_expose_vscode_uri():
     repository = make_repository()
-    repository.root_path = "D:/projects/RepoAtlas Demo"
+    repository.root_path = "D:/projects/RepoMosaic Demo"
 
     data = repository_to_dict(repository)
     file_data = data["files"][0]
 
     assert file_data["vscode_uri"] == (
-        "vscode://file/D:/projects/RepoAtlas%20Demo/repoatlas/robot.py:1"
+        "vscode://file/D:/projects/RepoMosaic%20Demo/repomosaic/robot.py:1"
     )
     assert "vscode_uri" not in file_data["classes"][0]
     assert "vscode_uri" not in file_data["functions"][0]
@@ -365,7 +365,7 @@ def test_missing_source_description_is_not_invented():
 def test_full_source_and_symbol_ranges_are_preserved(tmp_path):
     repository = make_repository()
     repository.root_path = str(tmp_path)
-    source_path = tmp_path / "repoatlas" / "robot.py"
+    source_path = tmp_path / "repomosaic" / "robot.py"
     source_path.parent.mkdir()
     source = "\n".join("    # source line " + str(n) for n in range(1, 45)) + "\n"
     source_path.write_text(source, encoding="utf-8")

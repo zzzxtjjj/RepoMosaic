@@ -1,15 +1,15 @@
-from repoatlas.semantic.index import (
+from repomosaic.semantic.index import (
     build_summary_index,
     make_summary_key,
 )
-from repoatlas.semantic.models import SemanticSummary
+from repomosaic.semantic.models import SemanticSummary
 
 
 # 验证语义摘要可以根据代码身份和语言建立唯一索引
 def test_build_summary_index():
     chinese_summary = SemanticSummary(
         target_type="function",
-        file_path="repoatlas/core/parser.py",
+        file_path="repomosaic/core/parser.py",
         name="parse_python_file",
         summary="解析 Python 文件并提取代码结构。",
         language="zh-CN",
@@ -18,7 +18,7 @@ def test_build_summary_index():
 
     english_summary = SemanticSummary(
         target_type="function",
-        file_path="repoatlas/core/parser.py",
+        file_path="repomosaic/core/parser.py",
         name="parse_python_file",
         summary="Parses a Python file and extracts code structure.",
         language="en",
@@ -31,7 +31,7 @@ def test_build_summary_index():
 
     chinese_key = make_summary_key(
         target_type="function",
-        file_path="repoatlas/core/parser.py",
+        file_path="repomosaic/core/parser.py",
         name="parse_python_file",
         start_line=42,
         class_name=None,
@@ -40,7 +40,7 @@ def test_build_summary_index():
 
     english_key = make_summary_key(
         target_type="function",
-        file_path="repoatlas/core/parser.py",
+        file_path="repomosaic/core/parser.py",
         name="parse_python_file",
         start_line=42,
         class_name=None,
@@ -63,7 +63,7 @@ def test_build_summary_index():
 def test_lookup_summary_by_symbol_identity():
     summary = SemanticSummary(
         target_type="function",
-        file_path="repoatlas/core/parser.py",
+        file_path="repomosaic/core/parser.py",
         name="parse_python_file",
         summary="解析 Python 文件并提取代码结构。",
         language="zh-CN",
@@ -74,7 +74,7 @@ def test_lookup_summary_by_symbol_identity():
 
     key = make_summary_key(
         target_type="function",
-        file_path="repoatlas/core/parser.py",
+        file_path="repomosaic/core/parser.py",
         name="parse_python_file",
         start_line=42,
         class_name=None,

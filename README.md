@@ -1,16 +1,16 @@
 **English** | [简体中文](README.zh-CN.md)
 
-# RepoAtlas
+# RepoMosaic
 
 Turn an unfamiliar Python repository into a human-first, agent-readable knowledge map.
 
-RepoAtlas runs static analysis locally and produces a Markdown overview, structured JSON, and an interactive Repository Knowledge Canvas. Optional, opt-in LLM summaries add concise semantic explanations in eight supported languages.
+RepoMosaic runs static analysis locally and produces a Markdown overview, structured JSON, and an interactive Repository Knowledge Canvas. Optional, opt-in LLM summaries add concise semantic explanations in eight supported languages.
 
 ## Demo
 
-▶ **[Watch the 40-second RepoAtlas demo](docs/assets/repoatlas-demo.mp4)**
+▶ **[Watch the 40-second RepoMosaic demo](docs/assets/repomosaic-demo.mp4)**
 
-RepoAtlas turns an unfamiliar Python repository into a navigable knowledge canvas. In the demo, a real repository has already been analyzed into files, classes, functions, and methods. The developer searches for a symbol, selects it to inspect its path, type, signature, developer-written docstring, and optional AI summary, then moves from repository-level context to the corresponding source code. Zooming and panning make it practical to switch between the whole structure and a local implementation.
+RepoMosaic turns an unfamiliar Python repository into a navigable knowledge canvas. In the demo, a real repository has already been analyzed into files, classes, functions, and methods. The developer searches for a symbol, selects it to inspect its path, type, signature, developer-written docstring, and optional AI summary, then moves from repository-level context to the corresponding source code. Zooming and panning make it practical to switch between the whole structure and a local implementation.
 
 ```text
 Repository
@@ -25,7 +25,7 @@ Repository
 - **Locate an operation:** a Function or Method node connects its signature and source location to its description, optional summary, and source code. Methods retain class context through qualified names such as `ClassName.method_name`.
 - **Find a known name:** search locates the symbol and keeps it visible within the surrounding repository structure.
 
-Static analysis builds the map from source facts such as symbols, signatures, line ranges, and ownership relationships. Optional semantic analysis explains what those facts mean. RepoAtlas does not execute functions or dynamically observe runtime behavior.
+Static analysis builds the map from source facts such as symbols, signatures, line ranges, and ownership relationships. Optional semantic analysis explains what those facts mean. RepoMosaic does not execute functions or dynamically observe runtime behavior.
 
 ## Key features
 
@@ -38,28 +38,28 @@ Static analysis builds the map from source facts such as symbols, signatures, li
 
 ## Quick Start
 
-### 1. Install RepoAtlas
+### 1. Install RepoMosaic
 
 Recommended:
 
 ```bash
-uv tool install repoatlas
+uv tool install repomosaic
 ```
 
-This installs RepoAtlas in an isolated environment and makes the `repoatlas` command available globally. Install it once, then use it from different repositories without activating a dedicated RepoAtlas virtual environment each time.
+This installs RepoMosaic in an isolated environment and makes the `repomosaic` command available globally. Install it once, then use it from different repositories without activating a dedicated RepoMosaic virtual environment each time.
 
 Alternatively:
 
 ```bash
-pip install repoatlas
+pip install repomosaic
 ```
 
-If you install RepoAtlas inside a Python virtual environment, activate that environment whenever you want to use the `repoatlas` command.
+If you install RepoMosaic inside a Python virtual environment, activate that environment whenever you want to use the `repomosaic` command.
 
 ### 2. Save your API key once
 
 ```bash
-repoatlas auth set
+repomosaic auth set
 ```
 
 The key is entered through a hidden prompt and stored in the system credential store.
@@ -68,27 +68,27 @@ The key is entered through a hidden prompt and stored in the system credential s
 
 ```bash
 cd path/to/project
-repoatlas init
+repomosaic init
 ```
 
-Answer the model, base URL, and output-language prompts. RepoAtlas writes `.repoatlas.toml` for you.
+Answer the model, base URL, and output-language prompts. RepoMosaic writes `.repomosaic.toml` for you.
 
 ### 4. Build the knowledge map
 
 ```bash
-repoatlas .
+repomosaic .
 ```
 
 ### 5. Explore
 
-Open `repoatlas_output/map.html` in a browser, or read `repoatlas_output/STRUCTURE.md` on GitHub or in VS Code.
+Open `repomosaic_output/map.html` in a browser, or read `repomosaic_output/STRUCTURE.md` on GitHub or in VS Code.
 
 ## Static-only mode
 
 No API key or model service is needed for local static analysis:
 
 ```bash
-repoatlas . --no-llm
+repomosaic . --no-llm
 ```
 
 `--no-llm` prevents model API calls even when a project contains LLM settings.
@@ -96,20 +96,20 @@ repoatlas . --no-llm
 ## Authentication
 
 ```bash
-repoatlas auth set
-repoatlas auth status
-repoatlas auth clear
+repomosaic auth set
+repomosaic auth status
+repomosaic auth clear
 ```
 
-- `set` saves one default RepoAtlas credential using Windows Credential Manager, macOS Keychain, or a supported Linux keyring backend.
+- `set` saves one default RepoMosaic credential using Windows Credential Manager, macOS Keychain, or a supported Linux keyring backend.
 - `status` reports only whether a key is available and its source; it never prints the key.
-- `clear` removes only the stored RepoAtlas credential.
+- `clear` removes only the stored RepoMosaic credential.
 
-For temporary use, the `REPOATLAS_API_KEY` environment variable overrides the stored credential. It is not necessary to save a separate key for every repository.
+For temporary use, the `REPOMOSAIC_API_KEY` environment variable overrides the stored credential. It is not necessary to save a separate key for every repository.
 
 ## Generated outputs
 
-By default, RepoAtlas creates `repoatlas_output/`:
+By default, RepoMosaic creates `repomosaic_output/`:
 
 - `map.html` — self-contained interactive Repository Knowledge Canvas
 - `STRUCTURE.md` — detailed Markdown map with a Mermaid overview
@@ -117,17 +117,17 @@ By default, RepoAtlas creates `repoatlas_output/`:
 
 Use `--output-dir PATH` to choose another directory.
 
-The default `repoatlas_output` directory represents the latest generated atlas for the current repository, so a later run may replace those files. To preserve static and semantic versions separately, choose distinct output directories:
+The default `repomosaic_output` directory represents the latest generated atlas for the current repository, so a later run may replace those files. To preserve static and semantic versions separately, choose distinct output directories:
 
 ```bash
 # Keep a static atlas
-repoatlas . --no-llm --output-dir repoatlas_output_static
+repomosaic . --no-llm --output-dir repomosaic_output_static
 
 # Keep a semantic atlas
-repoatlas . --output-dir repoatlas_output_semantic
+repomosaic . --output-dir repomosaic_output_semantic
 ```
 
-## How RepoAtlas works
+## How RepoMosaic works
 
 ```text
 Local repository
@@ -146,8 +146,8 @@ Static analysis remains the source of structural facts. When LLM mode is enabled
 The Python Agent API exposes repository structure, symbol search, and source lookup without requiring a UI. For MCP clients, install the optional dependency and start a server bound to one repository:
 
 ```bash
-pip install "repoatlas[mcp]"
-repoatlas-mcp path/to/project
+pip install "repomosaic[mcp]"
+repomosaic-mcp path/to/project
 ```
 
 The MCP server uses stdio and exposes `get_repository_structure`, `find_symbol`, and `get_symbol_source` tools. Configure the command in your MCP client according to that client's documentation.
@@ -157,10 +157,10 @@ The MCP server uses stdio and exposes `get_repository_structure`, `find_symbol`,
 Interactive setup:
 
 ```bash
-repoatlas init
+repomosaic init
 ```
 
-Advanced users can create a commented template with `repoatlas init --template`. Existing configuration is protected unless `--force` is supplied.
+Advanced users can create a commented template with `repomosaic init --template`. Existing configuration is protected unless `--force` is supplied.
 
 Project configuration contains non-secret LLM settings:
 
@@ -172,15 +172,15 @@ base_url = "https://your-provider.example/v1"
 language = "en"
 ```
 
-CLI options `--provider`, `--model`, `--base-url`, and `--lang` override `.repoatlas.toml`. Supported canonical language codes are `en`, `zh-CN`, `ja`, `ko`, `de`, `it`, `pt`, and `es`.
+CLI options `--provider`, `--model`, `--base-url`, and `--lang` override `.repomosaic.toml`. Supported canonical language codes are `en`, `zh-CN`, `ja`, `ko`, `de`, `it`, `pt`, and `es`.
 
 ## Privacy and security
 
 - Static analysis and `--no-llm` run locally without model API calls.
 - LLM summaries are optional and opt-in.
 - LLM mode sends relevant source code and repository context to the user-configured provider.
-- Credentials are resolved from `REPOATLAS_API_KEY` first, then the system credential store.
-- API keys are never written to `.repoatlas.toml`, `structure.json`, `map.html`, `STRUCTURE.md`, or other generated outputs.
+- Credentials are resolved from `REPOMOSAIC_API_KEY` first, then the system credential store.
+- API keys are never written to `.repomosaic.toml`, `structure.json`, `map.html`, `STRUCTURE.md`, or other generated outputs.
 - Never commit API keys. Review your provider's privacy, retention, and data-use policies before analyzing a private repository with LLM features.
 
 ## Development
@@ -194,4 +194,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance.
 
 ## License
 
-RepoAtlas is licensed under the [Apache License 2.0](LICENSE).
+RepoMosaic is licensed under the [Apache License 2.0](LICENSE).

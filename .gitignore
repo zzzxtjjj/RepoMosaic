@@ -5,6 +5,6 @@ __pycache__/
 *.egg-info/
 build/
 dist/
-repoatlas_output/
+repomosaic_output/
 output/
 qwen_flash_test/

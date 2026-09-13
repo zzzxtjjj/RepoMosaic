@@ -1,6 +1,6 @@
-# Contributing to RepoAtlas
+# Contributing to RepoMosaic
 
-Thanks for helping improve RepoAtlas.
+Thanks for helping improve RepoMosaic.
 
 ## Local setup
 

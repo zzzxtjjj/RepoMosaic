@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from repoatlas.core.paths import resolve_repository_file
+from repomosaic.core.paths import resolve_repository_file
 
 
 # 验证正常的仓库相对路径能够解析为仓库内部的绝对路径

@@ -1,5 +1,5 @@
-from repoatlas.core.symbols import FunctionInfo, ClassInfo, FileInfo
-from repoatlas.semantic.summarizer import summarize_function, summarize_class, summarize_file
+from repomosaic.core.symbols import FunctionInfo, ClassInfo, FileInfo
+from repomosaic.semantic.summarizer import summarize_function, summarize_class, summarize_file
 import pytest
 
 # 模拟一个假的 LLM，避免测试时真的调用外部 API
@@ -157,7 +157,7 @@ class FileFakeLLM:
 # 验证 summarize_file 能返回清理后的文件职责摘要
 def test_summarize_file_returns_clean_summary():
     file_info = FileInfo(
-        path="repoatlas/core/parser.py",
+        path="repomosaic/core/parser.py",
         module_docstring="Parse Python modules into structured metadata.",
         classes=[],
         functions=[
@@ -194,7 +194,7 @@ class RecordingFileFakeLLM:
 # 验证 summarize_file 将正确的文件结构信息传给 LLM
 def test_summarize_file_sends_correct_prompt():
     file_info = FileInfo(
-        path="repoatlas/core/parser.py",
+        path="repomosaic/core/parser.py",
         module_docstring="Parse Python modules into structured metadata.",
         classes=[],
         functions=[
@@ -218,7 +218,7 @@ def test_summarize_file_sends_correct_prompt():
     )
 
     assert fake_llm.received_prompt is not None
-    assert "repoatlas/core/parser.py" in fake_llm.received_prompt
+    assert "repomosaic/core/parser.py" in fake_llm.received_prompt
     assert "parse_python_file(file_path)" in fake_llm.received_prompt
     assert "ja" in fake_llm.received_prompt
     assert "Parse Python modules into structured metadata." in fake_llm.received_prompt
@@ -227,13 +227,13 @@ def test_summarize_file_sends_correct_prompt():
     assert "dependencies, or side effects" in fake_llm.received_prompt
 
 
-from repoatlas.core.symbols import (
+from repomosaic.core.symbols import (
     ClassInfo,
     FileInfo,
     FunctionInfo,
     RepositoryInfo,
 )
-from repoatlas.semantic.summarizer import summarize_repository
+from repomosaic.semantic.summarizer import summarize_repository
 
 
 # 模拟整仓语义分析使用的大模型，并记录收到的所有 Prompt

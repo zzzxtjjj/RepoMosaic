@@ -1,6 +1,6 @@
-from repoatlas.core.analyzer import analyze_repository
-from repoatlas.rendering.renderer import render_structure_markdown
-from repoatlas.rendering.visualizer import render_visual_map
+from repomosaic.core.analyzer import analyze_repository
+from repomosaic.rendering.renderer import render_structure_markdown
+from repomosaic.rendering.visualizer import render_visual_map
 
 
 def test_static_analysis_to_rendered_outputs(tmp_path):

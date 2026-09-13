@@ -3,9 +3,9 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "repoatlas"
+name = "repomosaic"
 dynamic = ["version"]
-description = "Human-first and agent-readable repository knowledge maps."
+description = "Repository intelligence for developers and coding agents."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
@@ -24,17 +24,17 @@ mcp = [
 ]
 
 [project.scripts]
-repoatlas = "repoatlas.cli:main"
-repoatlas-mcp = "repoatlas.mcp_server:main"
+repomosaic = "repomosaic.cli:main"
+repomosaic-mcp = "repomosaic.mcp_server:main"
 
 [tool.setuptools.dynamic]
-version = {attr = "repoatlas.__version__"}
+version = {attr = "repomosaic.__version__"}
 
 [tool.setuptools.packages.find]
-include = ["repoatlas*"]
+include = ["repomosaic*"]
 
 [tool.setuptools.package-data]
-"repoatlas.rendering" = ["templates/*.html"]
+"repomosaic.rendering" = ["templates/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

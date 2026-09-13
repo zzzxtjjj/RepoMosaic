@@ -1,8 +1,8 @@
 import pytest
 
-from repoatlas.llm.config import LLMConfig
-from repoatlas.llm.factory import create_llm_client
-from repoatlas.llm.openai_compatible import OpenAICompatibleClient
+from repomosaic.llm.config import LLMConfig
+from repomosaic.llm.factory import create_llm_client
+from repomosaic.llm.openai_compatible import OpenAICompatibleClient
 
 
 def test_create_openai_compatible_client():

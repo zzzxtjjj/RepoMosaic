@@ -721,7 +721,7 @@ wheels = [
 ]
 
 [[package]]
-name = "repoatlas"
+name = "repomosaic"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
