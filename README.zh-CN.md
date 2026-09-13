@@ -6,6 +6,27 @@
 
 RepoAtlas 在本地执行静态分析，并生成 Markdown 总览、结构化 JSON 和可交互的仓库知识画布。用户还可以主动启用 LLM，用八种受支持语言生成简洁的 AI 语义摘要。
 
+## 演示
+
+▶ **[观看约 40 秒的 RepoAtlas 演示](docs/assets/repoatlas-demo.mp4)**
+
+RepoAtlas 会把陌生的 Python 仓库转换成可导航的代码知识图谱。演示打开的是一个已经完成分析的真实仓库，其中的代码被拆解成 File、Class、Function 和 Method。开发者可以搜索目标 symbol，选中节点后查看路径、类型、签名、开发者编写的 docstring 和可选的 AI 语义摘要，再从仓库级上下文进入对应源码。缩放和平移则帮助开发者在整体结构与局部实现之间切换。
+
+```text
+Repository
+└── File
+    ├── Class
+    │   └── Method
+    └── Function
+```
+
+- **理解一个模块：**File 节点展示模块说明、可选语义摘要，以及其中包含的 Class 和 Function。
+- **理解一个对象或子系统：**Class 节点展示职责、源码位置、docstring、可选语义解释和所属 Method。
+- **定位一项操作：**Function 或 Method 节点把签名和源码位置与说明、可选摘要及实际源码连接起来。Method 会保留所属 Class 上下文，并使用 `ClassName.method_name` 形式的限定名称。
+- **只知道名称、不知道位置：**搜索可以定位 symbol，同时保留它在仓库结构中的上下文。
+
+静态分析根据 symbol、签名、行号范围和归属关系等源码事实构建地图；可选的语义分析进一步解释这些事实代表什么。RepoAtlas 不会执行函数，也不会动态观察程序运行行为。
+
 ## 核心功能
 
 - 基于 Python AST 在本地提取文件、类、方法、函数、签名、行号范围和 docstring

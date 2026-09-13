@@ -6,6 +6,27 @@ Turn an unfamiliar Python repository into a human-first, agent-readable knowledg
 
 RepoAtlas runs static analysis locally and produces a Markdown overview, structured JSON, and an interactive Repository Knowledge Canvas. Optional, opt-in LLM summaries add concise semantic explanations in eight supported languages.
 
+## Demo
+
+▶ **[Watch the 40-second RepoAtlas demo](docs/assets/repoatlas-demo.mp4)**
+
+RepoAtlas turns an unfamiliar Python repository into a navigable knowledge canvas. In the demo, a real repository has already been analyzed into files, classes, functions, and methods. The developer searches for a symbol, selects it to inspect its path, type, signature, developer-written docstring, and optional AI summary, then moves from repository-level context to the corresponding source code. Zooming and panning make it practical to switch between the whole structure and a local implementation.
+
+```text
+Repository
+└── File
+    ├── Class
+    │   └── Method
+    └── Function
+```
+
+- **Understand a module:** a File node shows its module description, optional semantic summary, and contained classes and functions.
+- **Understand an object or subsystem:** a Class node shows its responsibility, source location, docstring, optional semantic explanation, and methods.
+- **Locate an operation:** a Function or Method node connects its signature and source location to its description, optional summary, and source code. Methods retain class context through qualified names such as `ClassName.method_name`.
+- **Find a known name:** search locates the symbol and keeps it visible within the surrounding repository structure.
+
+Static analysis builds the map from source facts such as symbols, signatures, line ranges, and ownership relationships. Optional semantic analysis explains what those facts mean. RepoAtlas does not execute functions or dynamically observe runtime behavior.
+
 ## Key features
 
 - Local Python AST analysis for files, classes, methods, functions, signatures, line ranges, and docstrings
