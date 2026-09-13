@@ -47,7 +47,7 @@ def extract_function_info(node: ast.FunctionDef | ast.AsyncFunctionDef) -> Funct
         name=node.name,
         start_line=node.lineno,
         end_line=node.end_lineno,
-        parameters=[arg.arg for arg in node.args.args],
+        parameters=extract_parameters(node.args),
         docstring=extract_docstring(node),
     )
 

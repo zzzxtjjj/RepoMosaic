@@ -117,6 +117,16 @@ By default, RepoAtlas creates `repoatlas_output/`:
 
 Use `--output-dir PATH` to choose another directory.
 
+The default `repoatlas_output` directory represents the latest generated atlas for the current repository, so a later run may replace those files. To preserve static and semantic versions separately, choose distinct output directories:
+
+```bash
+# Keep a static atlas
+repoatlas . --no-llm --output-dir repoatlas_output_static
+
+# Keep a semantic atlas
+repoatlas . --output-dir repoatlas_output_semantic
+```
+
 ## How RepoAtlas works
 
 ```text

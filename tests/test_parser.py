@@ -146,3 +146,39 @@ def calculate_distance(start, end):
     file_info = parse_python_file(file_path)
 
     assert file_info.module_docstring == ""
+
+
+def test_parser_preserves_complete_python_parameter_shape(tmp_path):
+    file_path = tmp_path / "signatures.py"
+    file_path.write_text(
+        """
+def transform(source, /, destination, *items, strict, **options):
+    return destination
+
+class Factory:
+    @classmethod
+    def build(cls, value, /, *, strict=False):
+        return value
+""".strip(),
+        encoding="utf-8",
+    )
+
+    file_info = parse_python_file(file_path)
+    function_info = file_info.functions[0]
+    method_info = file_info.methods[0]
+
+    assert function_info.parameters == [
+        "source",
+        "/",
+        "destination",
+        "*items",
+        "strict",
+        "**options",
+    ]
+    assert build_signature(function_info) == (
+        "transform(source, /, destination, *items, strict, **options)"
+    )
+    assert method_info.parameters == ["cls", "value", "/", "*", "strict"]
+    assert build_signature(method_info, is_method=True) == (
+        "build(value, /, *, strict)"
+    )

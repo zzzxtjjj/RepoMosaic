@@ -117,6 +117,16 @@ RepoAtlas 默认创建 `repoatlas_output/`：
 
 可使用 `--output-dir PATH` 指定其他目录。
 
+默认的 `repoatlas_output` 表示当前仓库最近一次生成的知识地图，因此后续运行可能替换其中的文件。如果希望分别保留静态分析版和语义增强版，可以指定不同的输出目录：
+
+```bash
+# 保留静态分析版
+repoatlas . --no-llm --output-dir repoatlas_output_static
+
+# 保留语义增强版
+repoatlas . --output-dir repoatlas_output_semantic
+```
+
 ## RepoAtlas 如何工作
 
 ```text

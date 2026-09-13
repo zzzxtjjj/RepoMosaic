@@ -77,7 +77,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-llm",
         action="store_true",
-        help="Disable LLM features (currently the default behavior).",
+        help="Disable LLM features and run static analysis only.",
     )
 
     parser.add_argument(
