@@ -6,6 +6,10 @@ Turn an unfamiliar Python repository into a human-first, agent-readable knowledg
 
 RepoMosaic runs static analysis locally and produces a Markdown overview, structured JSON, and an interactive Repository Knowledge Canvas. Optional, opt-in LLM summaries add concise semantic explanations in eight supported languages.
 
+## Status
+
+**Active Development — usable V0.1 CLI and library.** RepoMosaic currently analyzes Python source repositories. Its static outputs do not require an API key; semantic summaries are optional.
+
 ## Demo
 
 ▶ **[Watch the 40-second RepoMosaic demo](docs/assets/repomosaic-demo.mp4)**
@@ -182,6 +186,14 @@ CLI options `--provider`, `--model`, `--base-url`, and `--lang` override `.repom
 - Credentials are resolved from `REPOMOSAIC_API_KEY` first, then the system credential store.
 - API keys are never written to `.repomosaic.toml`, `structure.json`, `map.html`, `STRUCTURE.md`, or other generated outputs.
 - Never commit API keys. Review your provider's privacy, retention, and data-use policies before analyzing a private repository with LLM features.
+
+## Current limitations
+
+- Source analysis is currently Python-specific and AST-based; RepoMosaic does not execute or dynamically trace the target repository.
+- Call graphs, runtime data flow, dependency resolution across installed packages, and semantic equivalence are outside the current static model.
+- Optional summaries depend on the configured OpenAI-compatible provider and should be reviewed rather than treated as source facts.
+- The generated Knowledge Canvas is a self-contained local HTML artifact, not a hosted collaborative service.
+- MCP mode exposes the implemented repository structure, symbol search, and source lookup tools; it is not a general coding-agent runtime.
 
 ## Development
 
